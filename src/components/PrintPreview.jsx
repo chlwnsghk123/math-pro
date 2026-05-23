@@ -6,13 +6,30 @@ import AnswerText from './AnswerText.jsx';
 import { IconBack, IconPrint } from './Icons.jsx';
 import { useToastStore } from '../store/toastStore.js';
 
-/** One problem per column, two columns per A4 page. */
-const PROBLEMS_PER_PAGE = 2;
-const RIGHT_CROP_PX = 10;
-const PAGE_WIDTH_MM = 210;
-const PAGE_HEIGHT_MM = 297;
+/* ─────────────────────────────────────────────────────────────────────
+ * Page geometry (landscape A4)
+ * ───────────────────────────────────────────────────────────────────── */
+const PAGE_WIDTH_MM = 297;
+const PAGE_HEIGHT_MM = 210;
 const PAGE_PADDING_MM = 12;
+const PROBLEMS_PER_PAGE = 4; // 2×2 quadrants
+const QUADRANT_GAP_MM = 6;
 
+/**
+ * Image renders at fixed default size; shrinks proportionally if too tall.
+ * Sized to take 40% of the quadrant width and at most 80% of its height,
+ * leaving the right/bottom whitespace for student work.
+ *
+ * Quadrant ≈ 133.5mm × 75mm (after page padding, header, gap):
+ *   40% × 133.5 ≈ 53mm wide, 80% × 75 ≈ 60mm tall.
+ */
+const IMAGE_WIDTH_MM = 53;
+const IMAGE_MAX_HEIGHT_MM = 60;
+const RIGHT_CROP_PX = 40; // hidden by overflow wrapper
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Component
+ * ───────────────────────────────────────────────────────────────────── */
 export default function PrintPreview({ onClose }) {
   const items = useCartStore((s) => s.items);
   const [title, setTitle] = useState(
@@ -25,16 +42,11 @@ export default function PrintPreview({ onClose }) {
     localStorage.setItem('math-pro:last-title', title);
   }, [title]);
 
-  /** First problem of each category gets a chapter label. */
-  const annotated = useMemo(() => annotateWithChapters(items), [items]);
+  /** Each page contains up to 4 problems from a single chapter. */
+  const pages = useMemo(() => annotatePages(chunkByChapter(items, PROBLEMS_PER_PAGE)), [items]);
 
-  const pages = useMemo(() => {
-    const chunks = [];
-    for (let i = 0; i < annotated.length; i += PROBLEMS_PER_PAGE) {
-      chunks.push(annotated.slice(i, i + PROBLEMS_PER_PAGE));
-    }
-    return chunks;
-  }, [annotated]);
+  /** Answer key list uses the chapter-first annotation per item (not per page). */
+  const annotatedItems = useMemo(() => annotateWithChapters(items), [items]);
 
   async function handleDownload() {
     if (generating) return;
@@ -107,20 +119,24 @@ export default function PrintPreview({ onClose }) {
       <div className="flex-1 overflow-auto py-6">
         <div className="mx-auto flex w-fit flex-col items-center gap-5 px-4">
           {pages.length === 0 ? (
-            <div className="flex h-72 w-[210mm] max-w-full items-center justify-center rounded-md bg-white text-sm text-slate-500 shadow-card">
+            <div
+              className="flex h-72 items-center justify-center rounded-md bg-white text-sm text-slate-500 shadow-card"
+              style={{ width: `${PAGE_WIDTH_MM}mm` }}
+            >
               선택된 문제가 없습니다.
             </div>
           ) : (
             <>
-              {pages.map((chunk, pageIdx) => (
-                <PreviewPage
+              {pages.map((page, pageIdx) => (
+                <ProblemPage
                   key={pageIdx}
                   title={title}
-                  showHeader={pageIdx === 0}
-                  problems={chunk}
+                  isFirstPage={pageIdx === 0}
+                  chapter={page.chapter}
+                  items={page.items}
                 />
               ))}
-              <AnswerKeyPage annotated={annotated} />
+              <AnswerKeyPage annotated={annotatedItems} />
             </>
           )}
         </div>
@@ -129,84 +145,178 @@ export default function PrintPreview({ onClose }) {
   );
 }
 
-function PreviewPage({ title, showHeader, problems }) {
+/* ─────────────────────────────────────────────────────────────────────
+ * Pages
+ * ───────────────────────────────────────────────────────────────────── */
+
+function ProblemPage({ title, isFirstPage, chapter, items }) {
   return (
-    <article
-      data-pdf-page
-      className="bg-white shadow-card"
-      style={pageStyle}
-    >
-      {showHeader && <HeaderBlock title={title} />}
-      <div
-        className="grid grid-cols-2 gap-x-[10mm]"
-        style={{
-          gridAutoRows: 'min-content',
-          marginTop: showHeader ? '4mm' : 0,
-          flex: 1,
-        }}
-      >
-        {problems.map(({ id, chapter, category, number }) => (
-          <ProblemSlot
-            key={id}
-            id={id}
-            chapter={chapter}
-            src={buildImageUrl(category, number)}
-          />
-        ))}
-      </div>
+    <article data-pdf-page className="bg-white shadow-card" style={pageStyle}>
+      <PageHeader isFirstPage={isFirstPage} title={title} chapter={chapter} />
+      <QuadrantGrid items={items} />
     </article>
   );
 }
 
 const pageStyle = {
   width: `${PAGE_WIDTH_MM}mm`,
-  minHeight: `${PAGE_HEIGHT_MM}mm`,
+  height: `${PAGE_HEIGHT_MM}mm`,
   padding: `${PAGE_PADDING_MM}mm`,
   boxSizing: 'border-box',
   display: 'flex',
   flexDirection: 'column',
   color: '#0f172a',
+  overflow: 'hidden',
 };
 
-function HeaderBlock({ title }) {
+function PageHeader({ isFirstPage, title, chapter }) {
   return (
-    <div className="flex items-end justify-between gap-6 border-b border-slate-900 pb-2">
-      <div className="text-[20pt] font-bold leading-tight text-slate-900">
-        {title || '오답 노트'}
+    <header
+      style={{
+        flexShrink: 0,
+        marginBottom: '4mm',
+        paddingBottom: '2mm',
+        borderBottom: '1px solid #cbd5e1',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '2mm',
+      }}
+    >
+      {/* Title row — page 1 only, but the slot is always reserved so the
+          quadrant grid below stays at the same height on every page. */}
+      <div
+        style={{
+          height: '14mm',
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          gap: '8mm',
+        }}
+      >
+        {isFirstPage ? (
+          <>
+            <div
+              style={{
+                fontSize: '22pt',
+                fontWeight: 700,
+                color: '#0f172a',
+                lineHeight: 1,
+              }}
+            >
+              {title || '오답 노트'}
+            </div>
+            <div
+              style={{
+                fontSize: '10pt',
+                textAlign: 'right',
+                lineHeight: 1.7,
+                color: '#0f172a',
+              }}
+            >
+              <div>
+                Name
+                <span
+                  style={{
+                    display: 'inline-block',
+                    minWidth: '50mm',
+                    borderBottom: '1px solid #475569',
+                    marginLeft: '6pt',
+                  }}
+                />
+              </div>
+              <div>
+                Date
+                <span
+                  style={{
+                    display: 'inline-block',
+                    minWidth: '50mm',
+                    borderBottom: '1px solid #475569',
+                    marginLeft: '6pt',
+                  }}
+                />
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
-      <div className="shrink-0 text-right text-[10pt] leading-7 text-slate-900">
-        <div>
-          Name
-          <span className="ml-2 inline-block min-w-[42mm] border-b border-slate-700" />
-        </div>
-        <div>
-          Date
-          <span className="ml-2 inline-block min-w-[42mm] border-b border-slate-700" />
-        </div>
+      {/* Chapter row — always reserved; blank when this page continues a
+          chapter that already started earlier. */}
+      <div
+        style={{
+          fontSize: '14pt',
+          fontWeight: 700,
+          color: '#0f172a',
+          height: '8mm',
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        {chapter || ' '}
       </div>
-    </div>
+    </header>
   );
 }
 
-function ProblemSlot({ id, chapter, src }) {
+function QuadrantGrid({ items }) {
+  // Always render a 2x2 grid; empty slots stay blank so layout is consistent
+  const slots = [0, 1, 2, 3].map((i) => items[i] || null);
   return (
     <div
-      className="flex flex-col break-inside-avoid"
-      style={{ paddingTop: '4mm', paddingBottom: '4mm' }}
+      style={{
+        flex: 1,
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gridTemplateRows: '1fr 1fr',
+        gap: `${QUADRANT_GAP_MM}mm`,
+        minHeight: 0,
+      }}
     >
-      {chapter && (
-        <div className="mb-2 border-b border-slate-300 pb-1 text-[11pt] font-bold text-slate-900">
-          {chapter}
-        </div>
-      )}
-      <CroppedImage src={src} alt={id} cropRight={RIGHT_CROP_PX} />
+      {slots.map((id, idx) => (
+        <Quadrant key={idx} id={id} />
+      ))}
     </div>
   );
 }
 
-function CroppedImage({ src, alt, cropRight }) {
+function Quadrant({ id }) {
+  if (!id) {
+    return <div />;
+  }
+  const parsed = parseProblemId(id);
+  if (!parsed) return <div />;
+  const src = buildImageUrl(parsed.category, parsed.number);
   return (
-    <div style={{ overflow: 'hidden', width: '100%' }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+        overflow: 'hidden',
+      }}
+    >
+      <ProblemImageBox src={src} alt={id} />
+    </div>
+  );
+}
+
+/**
+ * Image renders at fixed width IMAGE_WIDTH_MM; if its natural aspect would
+ * exceed IMAGE_MAX_HEIGHT_MM, it shrinks uniformly so the height fits.
+ * The right RIGHT_CROP_PX is hidden by an overflow wrapper.
+ */
+function ProblemImageBox({ src, alt }) {
+  return (
+    <div
+      style={{
+        width: `${IMAGE_WIDTH_MM}mm`,
+        maxHeight: `${IMAGE_MAX_HEIGHT_MM}mm`,
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+        flexShrink: 0,
+      }}
+    >
       <img
         src={src}
         alt={alt}
@@ -215,26 +325,44 @@ function CroppedImage({ src, alt, cropRight }) {
         decoding="async"
         style={{
           display: 'block',
-          width: `calc(100% + ${cropRight}px)`,
+          maxWidth: `calc(${IMAGE_WIDTH_MM}mm + ${RIGHT_CROP_PX}px)`,
+          maxHeight: `${IMAGE_MAX_HEIGHT_MM}mm`,
+          width: 'auto',
           height: 'auto',
-          objectFit: 'contain',
+          flexShrink: 0,
         }}
       />
     </div>
   );
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+ * Answer key (landscape, 3 columns)
+ * ───────────────────────────────────────────────────────────────────── */
+
 function AnswerKeyPage({ annotated }) {
   if (annotated.length === 0) return null;
   return (
     <article data-pdf-page className="bg-white shadow-card" style={pageStyle}>
-      <div className="mb-4 flex items-end justify-between border-b border-slate-900 pb-2">
+      <div
+        style={{
+          flexShrink: 0,
+          marginBottom: '4mm',
+          paddingBottom: '3mm',
+          borderBottom: '1.5px solid #0f172a',
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+        }}
+      >
         <h2 className="text-[20pt] font-bold leading-tight text-slate-900">정답</h2>
         <div className="text-[10pt] text-slate-500">총 {annotated.length}문항</div>
       </div>
       <div
         style={{
-          columnCount: 2,
+          flex: 1,
+          minHeight: 0,
+          columnCount: 3,
           columnGap: '12mm',
         }}
       >
@@ -246,9 +374,9 @@ function AnswerKeyPage({ annotated }) {
                   fontSize: '12pt',
                   fontWeight: 700,
                   color: '#0f172a',
-                  marginTop: idx === 0 ? 0 : '10pt',
-                  marginBottom: '5pt',
-                  paddingBottom: '3pt',
+                  marginTop: idx === 0 ? 0 : '8pt',
+                  marginBottom: '4pt',
+                  paddingBottom: '2pt',
                   borderBottom: '1.5px solid #0f172a',
                   breakAfter: 'avoid-column',
                   pageBreakAfter: 'avoid',
@@ -262,7 +390,7 @@ function AnswerKeyPage({ annotated }) {
                 breakInside: 'avoid',
                 pageBreakInside: 'avoid',
                 marginBottom: '4pt',
-                fontSize: '11pt',
+                fontSize: '10.5pt',
                 lineHeight: 1.55,
                 color: '#0f172a',
                 display: 'flex',
@@ -274,7 +402,7 @@ function AnswerKeyPage({ annotated }) {
                 style={{
                   fontWeight: 700,
                   color: '#1d4ed8',
-                  minWidth: '9mm',
+                  minWidth: '8mm',
                   flexShrink: 0,
                   textAlign: 'right',
                 }}
@@ -292,12 +420,57 @@ function AnswerKeyPage({ annotated }) {
   );
 }
 
-/**
- * Annotate cart items in order. Each entry carries its parsed
- * category/number plus a `chapter` label that is non-null only on the
- * first item of each category (so the chapter heading is shown once
- * per category in both the problem pages and the answer key).
- */
+function Spinner() {
+  return (
+    <svg
+      className="h-4 w-4 animate-spin"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+    >
+      <circle cx="12" cy="12" r="9" opacity="0.25" />
+      <path d="M21 12a9 9 0 0 0-9-9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Helpers: chunk by chapter, then annotate page-level chapter heading
+ * ───────────────────────────────────────────────────────────────────── */
+
+function chunkByChapter(items, perPage) {
+  const pages = [];
+  let currentCategory = null;
+  let chunk = [];
+  for (const id of items) {
+    const parsed = parseProblemId(id);
+    const cat = parsed?.category;
+    const needsNewPage = cat !== currentCategory || chunk.length >= perPage;
+    if (needsNewPage && chunk.length > 0) {
+      pages.push(chunk);
+      chunk = [];
+    }
+    currentCategory = cat;
+    chunk.push(id);
+  }
+  if (chunk.length > 0) pages.push(chunk);
+  return pages;
+}
+
+function annotatePages(pages) {
+  const seen = new Set();
+  return pages.map((items) => {
+    const cat = parseProblemId(items[0])?.category;
+    const isFirstOfChapter = cat && !seen.has(cat);
+    if (isFirstOfChapter) seen.add(cat);
+    return {
+      items,
+      chapter: isFirstOfChapter ? CHAPTERS[cat] || cat : null,
+    };
+  });
+}
+
 function annotateWithChapters(items) {
   const seen = new Set();
   return items.map((id) => {
@@ -314,25 +487,10 @@ function annotateWithChapters(items) {
   });
 }
 
-function Spinner() {
-  return (
-    <svg
-      className="h-4 w-4 animate-spin"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-    >
-      <circle cx="12" cy="12" r="9" opacity="0.25" />
-      <path d="M21 12a9 9 0 0 0-9-9" strokeLinecap="round" />
-    </svg>
-  );
-}
+/* ─────────────────────────────────────────────────────────────────────
+ * PDF generation
+ * ───────────────────────────────────────────────────────────────────── */
 
-/* =============================================================
- * PDF generation: capture each .pdf-page element via html2canvas
- * and assemble into an A4 PDF via jsPDF.
- * ============================================================= */
 async function generatePdf({ title }) {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
     import('html2canvas'),
@@ -348,7 +506,7 @@ async function generatePdf({ title }) {
   }
 
   const pdf = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'landscape',
     unit: 'mm',
     format: 'a4',
     compress: true,
@@ -366,7 +524,7 @@ async function generatePdf({ title }) {
       windowHeight: pageEls[i].scrollHeight,
     });
     const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    if (i > 0) pdf.addPage();
+    if (i > 0) pdf.addPage('a4', 'landscape');
     pdf.addImage(imgData, 'JPEG', 0, 0, PAGE_WIDTH_MM, PAGE_HEIGHT_MM, undefined, 'FAST');
   }
 
