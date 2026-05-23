@@ -3,24 +3,40 @@ export const REPO_NAME = import.meta.env.VITE_REPO_NAME || 'math-pro';
 export const REPO_BRANCH = import.meta.env.VITE_REPO_BRANCH || 'main';
 export const IMAGE_BASE_PATH = import.meta.env.VITE_IMAGE_BASE_PATH || 'images';
 
-export const CATEGORIES = ['F', 'G', 'H', 'I', 'J'];
+/**
+ * Display category labels (no zero padding).
+ * Folders on disk are zero-padded to 2 digits (e.g. "07"); see buildImageUrl.
+ */
+export const CATEGORIES = ['7', '8', '9', '10', '11', '12'];
+
+function padCategory(category) {
+  return String(category).padStart(2, '0');
+}
 
 export function buildImageUrl(category, number) {
-  const padded = String(number).padStart(3, '0');
-  return `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REPO_BRANCH}/${IMAGE_BASE_PATH}/${category}/${padded}.png`;
+  const folder = padCategory(category);
+  const filename = String(number).padStart(3, '0');
+  return `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REPO_BRANCH}/${IMAGE_BASE_PATH}/${folder}/${filename}.png`;
 }
 
 export function parseProblemId(id) {
   if (typeof id !== 'string') return null;
-  const match = id.trim().toUpperCase().match(/^([F-J])(\d+)$/);
+  const match = id.trim().match(/^(\d{1,2})-(\d{1,3})$/);
   if (!match) return null;
-  return { category: match[1], number: Number(match[2]) };
+  const category = String(Number(match[1]));
+  const number = Number(match[2]);
+  if (!CATEGORIES.includes(category)) return null;
+  return { category, number };
+}
+
+export function formatProblemId(category, number) {
+  return `${category}-${number}`;
 }
 
 export function compareProblemIds(a, b) {
   const pa = parseProblemId(a);
   const pb = parseProblemId(b);
   if (!pa || !pb) return a.localeCompare(b);
-  if (pa.category !== pb.category) return pa.category.localeCompare(pb.category);
+  if (pa.category !== pb.category) return Number(pa.category) - Number(pb.category);
   return pa.number - pb.number;
 }

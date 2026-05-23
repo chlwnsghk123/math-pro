@@ -9,8 +9,10 @@ import ANSWERS from '../data/answers.js';
 export default function ProblemGrid({ category }) {
   const items = useMemo(() => {
     return Object.keys(ANSWERS)
-      .filter((id) => id.startsWith(category))
-      .map((id) => ({ id, ...parseProblemId(id) }))
+      .map((id) => {
+        const parsed = parseProblemId(id);
+        return parsed ? { id, ...parsed } : null;
+      })
       .filter((x) => x && x.category === category)
       .sort((a, b) => a.number - b.number);
   }, [category]);

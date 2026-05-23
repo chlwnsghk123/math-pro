@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { IconClose, IconPlus, IconSearch } from './Icons.jsx';
-import { parseProblemId } from '../config.js';
+import { compareProblemIds, parseProblemId } from '../config.js';
 import { useCartStore } from '../store/cartStore.js';
 import { useToastStore } from '../store/toastStore.js';
 import ANSWERS from '../data/answers.js';
@@ -21,19 +21,19 @@ export default function SearchBar({ onJump }) {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  const query = value.trim().toUpperCase();
+  const query = value.trim();
   const suggestions = (() => {
     if (!query) return [];
     return Object.keys(ANSWERS)
       .filter((id) => id.startsWith(query))
-      .sort()
+      .sort(compareProblemIds)
       .slice(0, 8);
   })();
 
   function handleAdd(id) {
     const parsed = parseProblemId(id);
     if (!parsed) {
-      toast('올바른 문제 번호 형식이 아닙니다 (예: F30)', { tone: 'warn' });
+      toast('올바른 문제 번호 형식이 아닙니다 (예: 7-30)', { tone: 'warn' });
       return;
     }
     if (!ANSWERS[id]) {
@@ -74,7 +74,7 @@ export default function SearchBar({ onJump }) {
             setValue(e.target.value);
             setOpen(true);
           }}
-          placeholder="문제 번호 검색 · 예: F30"
+          placeholder="문제 번호 검색 · 예: 7-30"
           className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
         />
         {value && (

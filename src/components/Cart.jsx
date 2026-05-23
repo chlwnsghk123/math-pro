@@ -60,7 +60,7 @@ export default function Cart({ onPreview, className = '', variant = 'panel', onC
                   key={id}
                   className="group flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-slate-50"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-sm font-bold text-brand-700">
+                  <span className="flex h-9 min-w-[2.5rem] shrink-0 items-center justify-center rounded-lg bg-brand-50 px-1.5 text-xs font-bold text-brand-700">
                     {parsed?.category}
                   </span>
                   <div className="min-w-0 flex-1">
