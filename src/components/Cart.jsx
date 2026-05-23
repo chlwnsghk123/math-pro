@@ -4,7 +4,7 @@ import { parseProblemId } from '../config.js';
 import AnswerText from './AnswerText.jsx';
 import ANSWERS from '../data/answers.js';
 
-export default function Cart({ onPreview, className = '', variant = 'panel', onClose }) {
+export default function Cart({ onCreate, className = '', variant = 'panel', onClose }) {
   const items = useCartStore((s) => s.items);
   const remove = useCartStore((s) => s.remove);
   const clear = useCartStore((s) => s.clear);
@@ -90,7 +90,7 @@ export default function Cart({ onPreview, className = '', variant = 'panel', onC
         <button
           type="button"
           disabled={!hasItems}
-          onClick={onPreview}
+          onClick={onCreate}
           className="btn-primary w-full"
         >
           <IconPrint className="h-4 w-4" /> 오답노트 생성

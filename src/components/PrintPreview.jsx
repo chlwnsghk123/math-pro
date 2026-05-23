@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useCartStore } from '../store/cartStore.js';
+import { useMemo, useState } from 'react';
 import { buildImageUrl, CHAPTERS, parseProblemId } from '../config.js';
 import ANSWERS from '../data/answers.js';
 import AnswerText from './AnswerText.jsx';
 import { IconBack, IconPrint } from './Icons.jsx';
+import { useNotebookStore } from '../store/notebookStore.js';
 import { useToastStore } from '../store/toastStore.js';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -29,24 +29,23 @@ const PAGE_WIDTH_MM = 297;
 const PAGE_HEIGHT_MM = 210;
 const PROBLEMS_PER_PAGE = 4;
 
-export default function PrintPreview({ onClose }) {
-  const items = useCartStore((s) => s.items);
-  const [title, setTitle] = useState(
-    () => localStorage.getItem('math-pro:last-title') || '오답 노트',
-  );
-  const [studentName, setStudentName] = useState(
-    () => localStorage.getItem('math-pro:last-name') || '',
-  );
-  const [studentDate, setStudentDate] = useState(() => todayIso());
+export default function PrintPreview({ notebook, onClose }) {
+  const updateNotebook = useNotebookStore((s) => s.update);
+
+  // Edits to the cover fields are written straight back to the notebook
+  // so the saved snapshot stays in sync. The notebook prop drives all
+  // local values — there is no separate cart-derived state here anymore.
+  const items = notebook.problemIds;
+  const title = notebook.title;
+  const studentName = notebook.studentName;
+  const studentDate = notebook.studentDate;
+
+  const setTitle = (v) => updateNotebook(notebook.id, { title: v });
+  const setStudentName = (v) => updateNotebook(notebook.id, { studentName: v });
+  const setStudentDate = (v) => updateNotebook(notebook.id, { studentDate: v });
+
   const [generating, setGenerating] = useState(false);
   const toast = useToastStore((s) => s.show);
-
-  useEffect(() => {
-    localStorage.setItem('math-pro:last-title', title);
-  }, [title]);
-  useEffect(() => {
-    localStorage.setItem('math-pro:last-name', studentName);
-  }, [studentName]);
 
   /** Problem pages: chunk by chapter, then split into pages of 4. */
   const pages = useMemo(() => annotatePages(chunkByChapter(items, PROBLEMS_PER_PAGE)), [items]);
@@ -61,7 +60,7 @@ export default function PrintPreview({ onClose }) {
     if (generating) return;
     setGenerating(true);
     try {
-      await generatePdf({ title });
+      await generatePdf({ title, studentName, studentDate });
       toast('PDF 저장 완료', { tone: 'success' });
     } catch (err) {
       console.error(err);
@@ -385,12 +384,6 @@ function ToolbarField({ label, value, onChange, type = 'text', placeholder }) {
   );
 }
 
-function todayIso() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 /** "2026-05-23" → "2026. 05. 23." Empty / invalid → empty string. */
 function formatKoreanDate(iso) {
   if (!iso) return '';
@@ -413,37 +406,17 @@ function QuadrantGrid({ items }) {
         position: 'relative',
       }}
     >
-      {/* Faint cross dividers (hair-soft) */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: '50%',
-          width: '1px',
-          background: C.hairSoft,
-          pointerEvents: 'none',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: '50%',
-          height: '1px',
-          background: C.hairSoft,
-          pointerEvents: 'none',
-        }}
-      />
       {slots.map((id, idx) => (
-        <Cell key={idx} id={id} />
+        <Cell key={idx} id={id} idx={idx} />
       ))}
     </div>
   );
 }
 
-function Cell({ id }) {
+function Cell({ id, idx }) {
+  // 2×2 grid: cells 0,1 are top row; 0,2 are left column.
+  const isLeftCol = idx % 2 === 0;
+  const isTopRow = idx < 2;
   return (
     <div
       style={{
@@ -453,6 +426,10 @@ function Cell({ id }) {
         background: C.paper,
         display: 'flex',
         flexDirection: 'column',
+        // Dashed cell outline drawn only on right/bottom of cells that
+        // have a neighbour, so internal lines never double up.
+        borderRight: isLeftCol ? `1px dashed ${C.hairSoft}` : 'none',
+        borderBottom: isTopRow ? `1px dashed ${C.hairSoft}` : 'none',
       }}
     >
       {id && <ProblemImage id={id} />}
@@ -474,11 +451,12 @@ function ProblemImage({ id }) {
       style={{
         display: 'block',
         alignSelf: 'flex-start',
-        maxWidth: '40%',
+        maxWidth: '60%',
         maxHeight: '80%',
         width: 'auto',
         height: 'auto',
         objectFit: 'contain',
+        imageRendering: 'crisp-edges',
       }}
     />
   );
@@ -664,8 +642,8 @@ function AnswerGroup({ unitCode, unitName, entries, isLast }) {
           padding: 0,
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          columnGap: '6mm',
-          rowGap: '2.5mm',
+          columnGap: '10mm',
+          rowGap: '5mm',
         }}
       >
         {entries.map(({ id, displayNumber }) => (
@@ -673,19 +651,22 @@ function AnswerGroup({ unitCode, unitName, entries, isLast }) {
             key={id}
             style={{
               display: 'grid',
-              gridTemplateColumns: '5mm 1fr',
+              gridTemplateColumns: '7mm 1fr',
               alignItems: 'baseline',
               gap: '3mm',
-              fontSize: '10.5pt',
+              fontSize: '11pt',
               color: C.ink,
-              lineHeight: 1.3,
+              lineHeight: 1.55,
               minWidth: 0,
+              paddingBottom: '3mm',
+              borderBottom: `1px dashed ${C.hairSoft}`,
             }}
           >
             <span
               style={{
                 fontFamily: FONT_MONO,
                 fontWeight: 600,
+                fontSize: '10.5pt',
                 color: C.ink,
                 fontVariantNumeric: 'tabular-nums',
               }}
@@ -698,7 +679,8 @@ function AnswerGroup({ unitCode, unitName, entries, isLast }) {
                 color: C.ink,
                 letterSpacing: '-0.01em',
                 minWidth: 0,
-                wordBreak: 'break-word',
+                wordBreak: 'keep-all',
+                overflowWrap: 'anywhere',
               }}
             >
               <AnswerText value={ANSWERS[id]} />
@@ -812,7 +794,7 @@ function extractUnitName(chapter) {
  * PDF generation: html2canvas + jsPDF (landscape)
  * ───────────────────────────────────────────────────────────────────── */
 
-async function generatePdf({ title }) {
+async function generatePdf({ title, studentName, studentDate }) {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
     import('html2canvas'),
     import('jspdf'),
@@ -822,6 +804,7 @@ async function generatePdf({ title }) {
   if (pageEls.length === 0) return;
 
   await waitForImages(pageEls);
+  await ensureKatexFontsLoaded(pageEls);
   if (document.fonts?.ready) {
     await document.fonts.ready;
   }
@@ -835,7 +818,9 @@ async function generatePdf({ title }) {
 
   for (let i = 0; i < pageEls.length; i++) {
     const canvas = await html2canvas(pageEls[i], {
-      scale: 2,
+      // scale=3 → ~288 DPI capture. Crisper KaTeX glyphs (esp. minus
+      // signs, fraction bars) and image edges than the previous scale=2.
+      scale: 3,
       useCORS: true,
       allowTaint: false,
       backgroundColor: '#ffffff',
@@ -844,13 +829,64 @@ async function generatePdf({ title }) {
       windowWidth: pageEls[i].scrollWidth,
       windowHeight: pageEls[i].scrollHeight,
     });
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    // PNG: lossless, preserves thin horizontal lines (math minus sign,
+    // fraction bars) that JPEG was blurring on PDF render.
+    const imgData = canvas.toDataURL('image/png');
     if (i > 0) pdf.addPage('a4', 'landscape');
-    pdf.addImage(imgData, 'JPEG', 0, 0, PAGE_WIDTH_MM, PAGE_HEIGHT_MM, undefined, 'FAST');
+    pdf.addImage(imgData, 'PNG', 0, 0, PAGE_WIDTH_MM, PAGE_HEIGHT_MM, undefined, 'MEDIUM');
   }
 
-  const safeName = (title || '오답 노트').replace(/[\\/:*?"<>|]/g, '_').trim();
-  pdf.save(`${safeName}.pdf`);
+  pdf.save(`${buildFilename({ title, studentName, studentDate })}.pdf`);
+}
+
+/** "제목-이름-날짜" with each segment file-system-safe. Empty name leaves
+ *  an empty middle segment, per spec. */
+function buildFilename({ title, studentName, studentDate }) {
+  const safe = (s) =>
+    String(s || '')
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .trim();
+  return `${safe(title) || '오답 노트'}-${safe(studentName)}-${safe(studentDate)}`;
+}
+
+/**
+ * KaTeX loads its custom math fonts lazily — only the glyphs that have
+ * already rendered have triggered a font fetch. html2canvas can capture
+ * a glyph as a blank box if its font file hasn't downloaded yet,
+ * producing visible artifacts where minus signs and fraction bars
+ * should be. Force-load every KaTeX font family before capture so the
+ * browser already has them in memory by the time html2canvas paints.
+ */
+async function ensureKatexFontsLoaded(roots) {
+  if (!document.fonts) return;
+  const hasKatex = roots.some((r) => r.querySelector('.katex'));
+  if (!hasKatex) return;
+  const families = [
+    'KaTeX_Main',
+    'KaTeX_Math',
+    'KaTeX_AMS',
+    'KaTeX_Size1',
+    'KaTeX_Size2',
+    'KaTeX_Size3',
+    'KaTeX_Size4',
+    'KaTeX_Caligraphic',
+    'KaTeX_Fraktur',
+    'KaTeX_SansSerif',
+    'KaTeX_Script',
+    'KaTeX_Typewriter',
+  ];
+  const variants = ['', 'italic ', 'bold ', 'bold italic '];
+  const loads = [];
+  for (const family of families) {
+    for (const v of variants) {
+      try {
+        loads.push(document.fonts.load(`${v}12px "${family}"`));
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  await Promise.allSettled(loads);
 }
 
 function waitForImages(roots) {

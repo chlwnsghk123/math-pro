@@ -3,7 +3,7 @@ import { useCartStore } from '../store/cartStore.js';
 import Cart from './Cart.jsx';
 import { IconCart, IconChevronDown } from './Icons.jsx';
 
-export default function MobileCartBar({ onPreview }) {
+export default function MobileCartBar({ onCreate }) {
   const count = useCartStore((s) => s.items.length);
   const [open, setOpen] = useState(false);
 
@@ -55,9 +55,9 @@ export default function MobileCartBar({ onPreview }) {
               <Cart
                 variant="sheet"
                 className="!shadow-none !ring-0"
-                onPreview={() => {
+                onCreate={() => {
                   setOpen(false);
-                  onPreview?.();
+                  onCreate?.();
                 }}
                 onClose={() => setOpen(false)}
               />
