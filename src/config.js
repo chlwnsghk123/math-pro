@@ -9,6 +9,19 @@ export const IMAGE_BASE_PATH = import.meta.env.VITE_IMAGE_BASE_PATH || 'images';
  */
 export const CATEGORIES = ['7', '8', '9', '10', '11', '12'];
 
+/**
+ * Chapter title shown on the first problem of each category in the print
+ * output. Key is the display category (`CATEGORIES`).
+ */
+export const CHAPTERS = {
+  '7': '07 여러 가지 방정식',
+  '8': '08 일차부등식과 연립일차부등식',
+  '9': '09 이차부등식과 연립이차부등식',
+  '10': '10 순열',
+  '11': '11 조합',
+  '12': '12 행렬',
+};
+
 function padCategory(category) {
   return String(category).padStart(2, '0');
 }
