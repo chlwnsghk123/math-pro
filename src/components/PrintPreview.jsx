@@ -34,12 +34,19 @@ export default function PrintPreview({ onClose }) {
   const [title, setTitle] = useState(
     () => localStorage.getItem('math-pro:last-title') || '오답 노트',
   );
+  const [studentName, setStudentName] = useState(
+    () => localStorage.getItem('math-pro:last-name') || '',
+  );
+  const [studentDate, setStudentDate] = useState(() => todayIso());
   const [generating, setGenerating] = useState(false);
   const toast = useToastStore((s) => s.show);
 
   useEffect(() => {
     localStorage.setItem('math-pro:last-title', title);
   }, [title]);
+  useEffect(() => {
+    localStorage.setItem('math-pro:last-name', studentName);
+  }, [studentName]);
 
   /** Problem pages: chunk by chapter, then split into pages of 4. */
   const pages = useMemo(() => annotatePages(chunkByChapter(items, PROBLEMS_PER_PAGE)), [items]);
@@ -69,57 +76,53 @@ export default function PrintPreview({ onClose }) {
       className="fixed inset-0 z-40 flex flex-col"
       style={{ background: C.stage, fontFamily: FONT_SANS }}
     >
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-soft sm:px-6">
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
-        >
-          <IconBack className="h-4 w-4" /> 돌아가기
-        </button>
-
-        <div className="hidden flex-1 items-center justify-center sm:flex">
-          <div className="flex max-w-md flex-1 items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200 focus-within:ring-brand-500">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              제목
-            </span>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: 6월 모의고사 오답노트"
-              className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none"
-            />
-          </div>
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-soft">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+          >
+            <IconBack className="h-4 w-4" /> 돌아가기
+          </button>
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={generating}
+            className="btn-primary"
+          >
+            {generating ? (
+              <>
+                <Spinner /> 생성 중…
+              </>
+            ) : (
+              <>
+                <IconPrint className="h-4 w-4" /> PDF 저장
+              </>
+            )}
+          </button>
         </div>
-
-        <button
-          type="button"
-          onClick={handleDownload}
-          disabled={generating}
-          className="btn-primary"
-        >
-          {generating ? (
-            <>
-              <Spinner /> 생성 중…
-            </>
-          ) : (
-            <>
-              <IconPrint className="h-4 w-4" /> PDF 저장
-            </>
-          )}
-        </button>
+        <div className="grid grid-cols-1 gap-2 px-4 pb-3 sm:grid-cols-[2fr_1fr_1fr] sm:px-6">
+          <ToolbarField
+            label="제목"
+            value={title}
+            onChange={setTitle}
+            placeholder="예: 6월 모의고사 오답노트"
+          />
+          <ToolbarField
+            label="이름"
+            value={studentName}
+            onChange={setStudentName}
+            placeholder="비워두면 손글씨 칸"
+          />
+          <ToolbarField
+            label="날짜"
+            type="date"
+            value={studentDate}
+            onChange={setStudentDate}
+          />
+        </div>
       </header>
-
-      <div className="border-b border-slate-200 bg-white px-4 py-2 sm:hidden">
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="제목을 입력하세요"
-          className="w-full rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-brand-500"
-        />
-      </div>
 
       <div className="flex-1 overflow-auto" style={{ padding: '40px 0 64px' }}>
         <div className="mx-auto flex w-fit flex-col items-center" style={{ gap: '40px' }}>
@@ -146,6 +149,8 @@ export default function PrintPreview({ onClose }) {
                 <ProblemPage
                   key={pageIdx}
                   title={title}
+                  studentName={studentName}
+                  studentDate={studentDate}
                   isFirstPage={pageIdx === 0}
                   unitCode={page.unitCode}
                   unitName={page.unitName}
@@ -195,6 +200,8 @@ const pageStyle = {
 
 function ProblemPage({
   title,
+  studentName,
+  studentDate,
   isFirstPage,
   unitCode,
   unitName,
@@ -208,6 +215,8 @@ function ProblemPage({
       <PageHeader
         isFirstPage={isFirstPage}
         title={title}
+        studentName={studentName}
+        studentDate={studentDate}
         unitCode={unitCode}
         unitName={unitName}
       />
@@ -222,7 +231,7 @@ function ProblemPage({
   );
 }
 
-function PageHeader({ isFirstPage, title, unitCode, unitName }) {
+function PageHeader({ isFirstPage, title, studentName, studentDate, unitCode, unitName }) {
   return (
     <header style={{ marginBottom: '4mm', flexShrink: 0 }}>
       {isFirstPage && (
@@ -250,8 +259,8 @@ function PageHeader({ isFirstPage, title, unitCode, unitName }) {
             {title || '오답 노트'}
           </h1>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12mm' }}>
-            <FieldGroup label="Name" />
-            <FieldGroup label="Date" />
+            <FieldGroup label="Name" value={studentName} />
+            <FieldGroup label="Date" value={formatKoreanDate(studentDate)} />
           </div>
         </div>
       )}
@@ -315,7 +324,7 @@ function PageHeader({ isFirstPage, title, unitCode, unitName }) {
   );
 }
 
-function FieldGroup({ label }) {
+function FieldGroup({ label, value }) {
   return (
     <div
       style={{
@@ -342,10 +351,52 @@ function FieldGroup({ label }) {
         style={{
           height: '6mm',
           borderBottom: `1px solid ${C.ink}`,
+          display: 'flex',
+          alignItems: 'flex-end',
+          paddingLeft: '1mm',
+          paddingBottom: '1mm',
+          fontSize: '11pt',
+          fontWeight: 500,
+          color: C.ink,
+          letterSpacing: '-0.01em',
+          lineHeight: 1,
         }}
-      />
+      >
+        {value || ''}
+      </span>
     </div>
   );
+}
+
+function ToolbarField({ label, value, onChange, type = 'text', placeholder }) {
+  return (
+    <label className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200 focus-within:ring-brand-500">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        {label}
+      </span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none"
+      />
+    </label>
+  );
+}
+
+function todayIso() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** "2026-05-23" → "2026. 05. 23." Empty / invalid → empty string. */
+function formatKoreanDate(iso) {
+  if (!iso) return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return `${m[1]}. ${m[2]}. ${m[3]}.`;
 }
 
 function QuadrantGrid({ items }) {
