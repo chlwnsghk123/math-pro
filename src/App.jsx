@@ -42,7 +42,7 @@ export default function App() {
     : null;
 
   return (
-    <div className="min-h-screen bg-canvas-muted">
+    <div className="app-root min-h-screen bg-canvas-muted">
       <Toaster />
 
       <header className="no-print sticky top-0 z-30 border-b border-slate-100 bg-white/85 backdrop-blur">

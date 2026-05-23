@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { buildImageUrl, CHAPTERS, parseProblemId } from '../config.js';
 import ANSWERS from '../data/answers.js';
 import AnswerText from './AnswerText.jsx';
 import { IconBack, IconPrint } from './Icons.jsx';
 import { useNotebookStore } from '../store/notebookStore.js';
-import { useToastStore } from '../store/toastStore.js';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Design tokens (lifted from the Claude Design handoff bundle).
@@ -44,8 +43,6 @@ export default function PrintPreview({ notebook, onClose }) {
   const setStudentName = (v) => updateNotebook(notebook.id, { studentName: v });
   const setStudentDate = (v) => updateNotebook(notebook.id, { studentDate: v });
 
-  const [generating, setGenerating] = useState(false);
-  const toast = useToastStore((s) => s.show);
 
   /** Problem pages: chunk by chapter, then split into pages of 4. */
   const pages = useMemo(() => annotatePages(chunkByChapter(items, PROBLEMS_PER_PAGE)), [items]);
@@ -56,26 +53,16 @@ export default function PrintPreview({ notebook, onClose }) {
   // Page numbering: every problem page + 1 answer page (if any)
   const totalPages = pages.length + (answerGroups.length > 0 ? 1 : 0);
 
-  async function handleDownload() {
-    if (generating) return;
-    setGenerating(true);
-    try {
-      await generatePdf({ title, studentName, studentDate });
-      toast('PDF 저장 완료', { tone: 'success' });
-    } catch (err) {
-      console.error(err);
-      toast('PDF 생성 중 오류가 발생했습니다', { tone: 'error' });
-    } finally {
-      setGenerating(false);
-    }
+  function handleDownload() {
+    handleBrowserPrint({ title, studentName, studentDate });
   }
 
   return (
     <div
-      className="fixed inset-0 z-40 flex flex-col"
+      className="print-preview-root fixed inset-0 z-40 flex flex-col"
       style={{ background: C.stage, fontFamily: FONT_SANS }}
     >
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-soft">
+      <header className="print-chrome sticky top-0 z-10 border-b border-slate-200 bg-white shadow-soft">
         <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <button
             type="button"
@@ -87,18 +74,9 @@ export default function PrintPreview({ notebook, onClose }) {
           <button
             type="button"
             onClick={handleDownload}
-            disabled={generating}
             className="btn-primary"
           >
-            {generating ? (
-              <>
-                <Spinner /> 생성 중…
-              </>
-            ) : (
-              <>
-                <IconPrint className="h-4 w-4" /> PDF 저장
-              </>
-            )}
+            <IconPrint className="h-4 w-4" /> 인쇄 / PDF
           </button>
         </div>
         <div className="grid grid-cols-1 gap-2 px-4 pb-3 sm:grid-cols-[2fr_1fr_1fr] sm:px-6">
@@ -123,8 +101,14 @@ export default function PrintPreview({ notebook, onClose }) {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto" style={{ padding: '40px 0 64px' }}>
-        <div className="mx-auto flex w-fit flex-col items-center" style={{ gap: '40px' }}>
+      <div
+        className="print-scroll flex-1 overflow-auto"
+        style={{ padding: '40px 0 64px' }}
+      >
+        <div
+          className="print-pages mx-auto flex w-fit flex-col items-center"
+          style={{ gap: '40px' }}
+        >
           {pages.length === 0 ? (
             <div
               style={{
@@ -238,9 +222,13 @@ function PageHeader({ isFirstPage, title, studentName, studentDate, unitCode, un
           style={{
             display: 'grid',
             gridTemplateColumns: 'auto 1fr',
-            alignItems: 'center',
+            // align-items: end so h1 + field-groups all bottom-align with
+            // the row's border-bottom — the field underlines and the
+            // container line collapse into one continuous horizontal rule
+            // instead of three offset lines.
+            alignItems: 'end',
             gap: '14mm',
-            paddingBottom: '5mm',
+            paddingBottom: 0,
             marginBottom: '4mm',
             borderBottom: `1px solid ${C.ink}`,
           }}
@@ -251,13 +239,21 @@ function PageHeader({ isFirstPage, title, studentName, studentDate, unitCode, un
               fontSize: '22pt',
               fontWeight: 800,
               letterSpacing: '-0.05em',
-              lineHeight: 1,
+              lineHeight: 1.1,
               color: C.ink,
+              paddingBottom: '1.5mm',
             }}
           >
             {title || '오답 노트'}
           </h1>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12mm' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              alignItems: 'end',
+              gap: '12mm',
+            }}
+          >
             <FieldGroup label="Name" value={studentName} />
             <FieldGroup label="Date" value={formatKoreanDate(studentDate)} />
           </div>
@@ -692,21 +688,6 @@ function AnswerGroup({ unitCode, unitName, entries, isLast }) {
   );
 }
 
-function Spinner() {
-  return (
-    <svg
-      className="h-4 w-4 animate-spin"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-    >
-      <circle cx="12" cy="12" r="9" opacity="0.25" />
-      <path d="M21 12a9 9 0 0 0-9-9" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 /* ─────────────────────────────────────────────────────────────────────
  * Pagination + chapter helpers
  * ───────────────────────────────────────────────────────────────────── */
@@ -791,52 +772,43 @@ function extractUnitName(chapter) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * PDF generation: html2canvas + jsPDF (landscape)
+ * Print path — defer to the browser's native print pipeline.
+ *
+ * Capturing the DOM through html2canvas had two persistent problems:
+ *   (1) hairlines on the page header were drawn at slightly offset y
+ *       coordinates (sub-pixel rounding in the raster pipeline), and
+ *   (2) KaTeX glyphs (esp. the minus sign and fraction bar) sometimes
+ *       came out as blurry blobs in the resulting PNG.
+ *
+ * Letting the browser print straight from the DOM avoids both — the
+ * lines and math are vector-rendered onto paper / the PDF backend.
+ * `@media print` styles in src/styles/index.css hide the chrome and
+ * make each `[data-pdf-page]` fill one A4 landscape sheet.
+ *
+ * We tweak `document.title` so the browser's "Save as PDF" dialog
+ * pre-fills the filename as "제목-이름-날짜".
  * ───────────────────────────────────────────────────────────────────── */
+function handleBrowserPrint({ title, studentName, studentDate }) {
+  const desiredName = buildFilename({ title, studentName, studentDate });
+  const prevTitle = document.title;
+  document.title = desiredName;
+  document.body.classList.add('is-printing');
 
-async function generatePdf({ title, studentName, studentDate }) {
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import('html2canvas'),
-    import('jspdf'),
-  ]);
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    document.title = prevTitle;
+    document.body.classList.remove('is-printing');
+    window.removeEventListener('afterprint', restore);
+  };
+  window.addEventListener('afterprint', restore);
 
-  const pageEls = Array.from(document.querySelectorAll('[data-pdf-page]'));
-  if (pageEls.length === 0) return;
+  // Some browsers don't reliably fire `afterprint`. Hard-restore after a
+  // few seconds so the modified title/body class never leaks.
+  setTimeout(restore, 6000);
 
-  await waitForImages(pageEls);
-  await ensureKatexFontsLoaded(pageEls);
-  if (document.fonts?.ready) {
-    await document.fonts.ready;
-  }
-
-  const pdf = new jsPDF({
-    orientation: 'landscape',
-    unit: 'mm',
-    format: 'a4',
-    compress: true,
-  });
-
-  for (let i = 0; i < pageEls.length; i++) {
-    const canvas = await html2canvas(pageEls[i], {
-      // scale=3 → ~288 DPI capture. Crisper KaTeX glyphs (esp. minus
-      // signs, fraction bars) and image edges than the previous scale=2.
-      scale: 3,
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: '#ffffff',
-      logging: false,
-      imageTimeout: 15000,
-      windowWidth: pageEls[i].scrollWidth,
-      windowHeight: pageEls[i].scrollHeight,
-    });
-    // PNG: lossless, preserves thin horizontal lines (math minus sign,
-    // fraction bars) that JPEG was blurring on PDF render.
-    const imgData = canvas.toDataURL('image/png');
-    if (i > 0) pdf.addPage('a4', 'landscape');
-    pdf.addImage(imgData, 'PNG', 0, 0, PAGE_WIDTH_MM, PAGE_HEIGHT_MM, undefined, 'MEDIUM');
-  }
-
-  pdf.save(`${buildFilename({ title, studentName, studentDate })}.pdf`);
+  window.print();
 }
 
 /** "제목-이름-날짜" with each segment file-system-safe. Empty name leaves
@@ -847,57 +819,4 @@ function buildFilename({ title, studentName, studentDate }) {
       .replace(/[\\/:*?"<>|]/g, '_')
       .trim();
   return `${safe(title) || '오답 노트'}-${safe(studentName)}-${safe(studentDate)}`;
-}
-
-/**
- * KaTeX loads its custom math fonts lazily — only the glyphs that have
- * already rendered have triggered a font fetch. html2canvas can capture
- * a glyph as a blank box if its font file hasn't downloaded yet,
- * producing visible artifacts where minus signs and fraction bars
- * should be. Force-load every KaTeX font family before capture so the
- * browser already has them in memory by the time html2canvas paints.
- */
-async function ensureKatexFontsLoaded(roots) {
-  if (!document.fonts) return;
-  const hasKatex = roots.some((r) => r.querySelector('.katex'));
-  if (!hasKatex) return;
-  const families = [
-    'KaTeX_Main',
-    'KaTeX_Math',
-    'KaTeX_AMS',
-    'KaTeX_Size1',
-    'KaTeX_Size2',
-    'KaTeX_Size3',
-    'KaTeX_Size4',
-    'KaTeX_Caligraphic',
-    'KaTeX_Fraktur',
-    'KaTeX_SansSerif',
-    'KaTeX_Script',
-    'KaTeX_Typewriter',
-  ];
-  const variants = ['', 'italic ', 'bold ', 'bold italic '];
-  const loads = [];
-  for (const family of families) {
-    for (const v of variants) {
-      try {
-        loads.push(document.fonts.load(`${v}12px "${family}"`));
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-  await Promise.allSettled(loads);
-}
-
-function waitForImages(roots) {
-  const imgs = roots.flatMap((r) => Array.from(r.querySelectorAll('img')));
-  return Promise.all(
-    imgs.map((img) => {
-      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-      return new Promise((resolve) => {
-        img.addEventListener('load', resolve, { once: true });
-        img.addEventListener('error', resolve, { once: true });
-      });
-    }),
-  );
 }
