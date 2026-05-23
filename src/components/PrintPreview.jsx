@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useCartStore } from '../store/cartStore.js';
 import { buildImageUrl, CHAPTERS, parseProblemId } from '../config.js';
 import ANSWERS from '../data/answers.js';
@@ -25,7 +25,6 @@ const QUADRANT_GAP_MM = 6;
  */
 const IMAGE_WIDTH_MM = 53;
 const IMAGE_MAX_HEIGHT_MM = 60;
-const RIGHT_CROP_PX = 40; // hidden by overflow wrapper
 
 /* ─────────────────────────────────────────────────────────────────────
  * Component
@@ -45,8 +44,8 @@ export default function PrintPreview({ onClose }) {
   /** Each page contains up to 4 problems from a single chapter. */
   const pages = useMemo(() => annotatePages(chunkByChapter(items, PROBLEMS_PER_PAGE)), [items]);
 
-  /** Answer key list uses the chapter-first annotation per item (not per page). */
-  const annotatedItems = useMemo(() => annotateWithChapters(items), [items]);
+  /** Answer key groups: one section per chapter, in cart order. */
+  const answerGroups = useMemo(() => groupAnswerEntriesByChapter(items), [items]);
 
   async function handleDownload() {
     if (generating) return;
@@ -136,7 +135,7 @@ export default function PrintPreview({ onClose }) {
                   items={page.items}
                 />
               ))}
-              <AnswerKeyPage annotated={annotatedItems} />
+              <AnswerKeyPage groups={answerGroups} total={items.length} />
             </>
           )}
         </div>
@@ -300,54 +299,45 @@ function Quadrant({ id }) {
 }
 
 /**
- * Image renders at fixed width IMAGE_WIDTH_MM; if its natural aspect would
- * exceed IMAGE_MAX_HEIGHT_MM, it shrinks uniformly so the height fits.
- * The right RIGHT_CROP_PX is hidden by an overflow wrapper.
+ * Image renders inside an IMAGE_WIDTH_MM × IMAGE_MAX_HEIGHT_MM box,
+ * fitting fully (aspect preserved). If its natural aspect makes the
+ * proportional height exceed the box, it shrinks uniformly so both
+ * dimensions fit.
  */
 function ProblemImageBox({ src, alt }) {
   return (
-    <div
+    <img
+      src={src}
+      alt={alt}
+      crossOrigin="anonymous"
+      loading="eager"
+      decoding="async"
       style={{
-        width: `${IMAGE_WIDTH_MM}mm`,
+        display: 'block',
+        maxWidth: `${IMAGE_WIDTH_MM}mm`,
         maxHeight: `${IMAGE_MAX_HEIGHT_MM}mm`,
-        overflow: 'hidden',
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'flex-start',
+        width: 'auto',
+        height: 'auto',
         flexShrink: 0,
+        objectFit: 'contain',
       }}
-    >
-      <img
-        src={src}
-        alt={alt}
-        crossOrigin="anonymous"
-        loading="eager"
-        decoding="async"
-        style={{
-          display: 'block',
-          maxWidth: `calc(${IMAGE_WIDTH_MM}mm + ${RIGHT_CROP_PX}px)`,
-          maxHeight: `${IMAGE_MAX_HEIGHT_MM}mm`,
-          width: 'auto',
-          height: 'auto',
-          flexShrink: 0,
-        }}
-      />
-    </div>
+    />
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * Answer key (landscape, 3 columns)
+ * Answer key — one section per chapter, stacked top-to-bottom.
+ * Entries inside each section flow in a 2-column grid (row-major).
  * ───────────────────────────────────────────────────────────────────── */
 
-function AnswerKeyPage({ annotated }) {
-  if (annotated.length === 0) return null;
+function AnswerKeyPage({ groups, total }) {
+  if (groups.length === 0) return null;
   return (
     <article data-pdf-page className="bg-white shadow-card" style={pageStyle}>
       <div
         style={{
           flexShrink: 0,
-          marginBottom: '4mm',
+          marginBottom: '5mm',
           paddingBottom: '3mm',
           borderBottom: '1.5px solid #0f172a',
           display: 'flex',
@@ -356,67 +346,83 @@ function AnswerKeyPage({ annotated }) {
         }}
       >
         <h2 className="text-[20pt] font-bold leading-tight text-slate-900">정답</h2>
-        <div className="text-[10pt] text-slate-500">총 {annotated.length}문항</div>
+        <div className="text-[10pt] text-slate-500">총 {total}문항</div>
       </div>
       <div
         style={{
           flex: 1,
           minHeight: 0,
-          columnCount: 3,
-          columnGap: '12mm',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '7mm',
         }}
       >
-        {annotated.map((it, idx) => (
-          <Fragment key={it.id}>
-            {it.chapter && (
-              <div
-                style={{
-                  fontSize: '12pt',
-                  fontWeight: 700,
-                  color: '#0f172a',
-                  marginTop: idx === 0 ? 0 : '8pt',
-                  marginBottom: '4pt',
-                  paddingBottom: '2pt',
-                  borderBottom: '1.5px solid #0f172a',
-                  breakAfter: 'avoid-column',
-                  pageBreakAfter: 'avoid',
-                }}
-              >
-                {it.chapter}
-              </div>
-            )}
-            <div
-              style={{
-                breakInside: 'avoid',
-                pageBreakInside: 'avoid',
-                marginBottom: '4pt',
-                fontSize: '10.5pt',
-                lineHeight: 1.55,
-                color: '#0f172a',
-                display: 'flex',
-                gap: '6pt',
-                alignItems: 'baseline',
-              }}
-            >
-              <span
-                style={{
-                  fontWeight: 700,
-                  color: '#1d4ed8',
-                  minWidth: '8mm',
-                  flexShrink: 0,
-                  textAlign: 'right',
-                }}
-              >
-                {it.number}.
-              </span>
-              <span style={{ flex: 1 }}>
-                <AnswerText value={ANSWERS[it.id]} />
-              </span>
-            </div>
-          </Fragment>
+        {groups.map((group) => (
+          <ChapterAnswerSection
+            key={group.category}
+            chapter={group.chapter}
+            entries={group.items}
+          />
         ))}
       </div>
     </article>
+  );
+}
+
+function ChapterAnswerSection({ chapter, entries }) {
+  return (
+    <section>
+      <div
+        style={{
+          fontSize: '13pt',
+          fontWeight: 700,
+          color: '#0f172a',
+          marginBottom: '3mm',
+          paddingBottom: '2pt',
+          borderBottom: '1.5px solid #0f172a',
+        }}
+      >
+        {chapter}
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          columnGap: '14mm',
+          rowGap: '4pt',
+        }}
+      >
+        {entries.map(({ id, number }) => (
+          <div
+            key={id}
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '6pt',
+              fontSize: '10.5pt',
+              lineHeight: 1.55,
+              color: '#0f172a',
+              minWidth: 0,
+            }}
+          >
+            <span
+              style={{
+                fontWeight: 700,
+                color: '#1d4ed8',
+                minWidth: '8mm',
+                flexShrink: 0,
+                textAlign: 'right',
+              }}
+            >
+              {number}.
+            </span>
+            <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
+              <AnswerText value={ANSWERS[id]} />
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -471,20 +477,28 @@ function annotatePages(pages) {
   });
 }
 
-function annotateWithChapters(items) {
-  const seen = new Set();
-  return items.map((id) => {
+/**
+ * Group answer-key entries by chapter, in cart order. Items are already
+ * sorted by category then number (see compareProblemIds), so a category
+ * boundary always opens a new group.
+ */
+function groupAnswerEntriesByChapter(items) {
+  const groups = [];
+  let current = null;
+  for (const id of items) {
     const parsed = parseProblemId(id);
-    const cat = parsed?.category;
-    const isFirstOfChapter = cat && !seen.has(cat);
-    if (isFirstOfChapter) seen.add(cat);
-    return {
-      id,
-      category: cat,
-      number: parsed?.number,
-      chapter: isFirstOfChapter ? CHAPTERS[cat] || cat : null,
-    };
-  });
+    if (!parsed) continue;
+    if (!current || current.category !== parsed.category) {
+      current = {
+        category: parsed.category,
+        chapter: CHAPTERS[parsed.category] || parsed.category,
+        items: [],
+      };
+      groups.push(current);
+    }
+    current.items.push({ id, number: parsed.number });
+  }
+  return groups;
 }
 
 /* ─────────────────────────────────────────────────────────────────────
