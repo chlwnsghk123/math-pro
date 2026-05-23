@@ -647,7 +647,7 @@ function AnswerGroup({ unitCode, unitName, entries, isLast }) {
             key={id}
             style={{
               display: 'grid',
-              gridTemplateColumns: '7mm 1fr',
+              gridTemplateColumns: '9mm 1fr',
               alignItems: 'baseline',
               gap: '3mm',
               fontSize: '11pt',
@@ -736,9 +736,10 @@ function annotatePages(pages) {
 }
 
 /**
- * Group answer-key entries by chapter, in cart order. Each entry is
- * given a `displayNumber` (1, 2, 3 …) relative to its chapter so the
- * answer key uses simple in-chapter indices.
+ * Group answer-key entries by chapter, in cart order. Each entry's
+ * `displayNumber` is the actual problem number from the ID
+ * (e.g. `9-15` → 15), so the answer key matches the textbook's
+ * original numbering instead of being re-indexed.
  */
 function groupAnswerEntriesByChapter(items) {
   const groups = [];
@@ -756,7 +757,7 @@ function groupAnswerEntriesByChapter(items) {
       };
       groups.push(current);
     }
-    current.items.push({ id, displayNumber: current.items.length + 1 });
+    current.items.push({ id, displayNumber: parsed.number });
   }
   return groups;
 }
