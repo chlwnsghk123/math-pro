@@ -11,7 +11,6 @@ import ANSWERS from './data/answers.js';
 import { useCartStore } from './store/cartStore.js';
 
 export default function App() {
-  const [tab, setTab] = useState(CATEGORIES[0]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const cartCount = useCartStore((s) => s.items.length);
 
@@ -23,6 +22,10 @@ export default function App() {
     }
     return map;
   }, []);
+
+  const [tab, setTab] = useState(
+    () => CATEGORIES.find((c) => (counts[c] ?? 0) > 0) || CATEGORIES[0],
+  );
 
   return (
     <div className="min-h-screen bg-canvas-muted">
