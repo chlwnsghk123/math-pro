@@ -7,28 +7,28 @@ import { IconBack, IconPrint } from './Icons.jsx';
 import { useToastStore } from '../store/toastStore.js';
 
 /* ─────────────────────────────────────────────────────────────────────
- * Page geometry (landscape A4)
+ * Design tokens (lifted from the Claude Design handoff bundle).
+ * Pure greyscale palette + Pretendard Variable + IBM Plex Mono.
  * ───────────────────────────────────────────────────────────────────── */
+const C = {
+  paper: '#ffffff',
+  ink: '#161616',
+  ink2: '#3d3d3d',
+  ink3: '#6f6f6f',
+  ink4: '#a8a8a8',
+  hair: '#cfcfcf',
+  hairSoft: '#e2e2e2',
+  stage: '#ecebe7',
+};
+const FONT_SANS =
+  '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
+const FONT_MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
+
+/* Page geometry */
 const PAGE_WIDTH_MM = 297;
 const PAGE_HEIGHT_MM = 210;
-const PAGE_PADDING_MM = 12;
-const PROBLEMS_PER_PAGE = 4; // 2×2 quadrants
-const QUADRANT_GAP_MM = 6;
+const PROBLEMS_PER_PAGE = 4;
 
-/**
- * Image renders at fixed default size; shrinks proportionally if too tall.
- * Sized to take 40% of the quadrant width and at most 80% of its height,
- * leaving the right/bottom whitespace for student work.
- *
- * Quadrant ≈ 133.5mm × 75mm (after page padding, header, gap):
- *   40% × 133.5 ≈ 53mm wide, 80% × 75 ≈ 60mm tall.
- */
-const IMAGE_WIDTH_MM = 53;
-const IMAGE_MAX_HEIGHT_MM = 60;
-
-/* ─────────────────────────────────────────────────────────────────────
- * Component
- * ───────────────────────────────────────────────────────────────────── */
 export default function PrintPreview({ onClose }) {
   const items = useCartStore((s) => s.items);
   const [title, setTitle] = useState(
@@ -41,11 +41,14 @@ export default function PrintPreview({ onClose }) {
     localStorage.setItem('math-pro:last-title', title);
   }, [title]);
 
-  /** Each page contains up to 4 problems from a single chapter. */
+  /** Problem pages: chunk by chapter, then split into pages of 4. */
   const pages = useMemo(() => annotatePages(chunkByChapter(items, PROBLEMS_PER_PAGE)), [items]);
 
-  /** Answer key groups: one section per chapter, in cart order. */
+  /** Answer key: one group per chapter, in cart order. */
   const answerGroups = useMemo(() => groupAnswerEntriesByChapter(items), [items]);
+
+  // Page numbering: every problem page + 1 answer page (if any)
+  const totalPages = pages.length + (answerGroups.length > 0 ? 1 : 0);
 
   async function handleDownload() {
     if (generating) return;
@@ -62,7 +65,10 @@ export default function PrintPreview({ onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-slate-200">
+    <div
+      className="fixed inset-0 z-40 flex flex-col"
+      style={{ background: C.stage, fontFamily: FONT_SANS }}
+    >
       <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-soft sm:px-6">
         <button
           type="button"
@@ -115,12 +121,22 @@ export default function PrintPreview({ onClose }) {
         />
       </div>
 
-      <div className="flex-1 overflow-auto py-6">
-        <div className="mx-auto flex w-fit flex-col items-center gap-5 px-4">
+      <div className="flex-1 overflow-auto" style={{ padding: '40px 0 64px' }}>
+        <div className="mx-auto flex w-fit flex-col items-center" style={{ gap: '40px' }}>
           {pages.length === 0 ? (
             <div
-              className="flex h-72 items-center justify-center rounded-md bg-white text-sm text-slate-500 shadow-card"
-              style={{ width: `${PAGE_WIDTH_MM}mm` }}
+              style={{
+                width: `${PAGE_WIDTH_MM}mm`,
+                height: '160mm',
+                background: C.paper,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11pt',
+                color: C.ink3,
+                boxShadow:
+                  '0 1px 0 rgba(0,0,0,.04), 0 12px 32px -12px rgba(0,0,0,.18), 0 2px 6px -2px rgba(0,0,0,.06)',
+              }}
             >
               선택된 문제가 없습니다.
             </div>
@@ -131,11 +147,22 @@ export default function PrintPreview({ onClose }) {
                   key={pageIdx}
                   title={title}
                   isFirstPage={pageIdx === 0}
-                  chapter={page.chapter}
+                  unitCode={page.unitCode}
+                  unitName={page.unitName}
+                  unitNameForFooter={page.unitNameForFooter}
                   items={page.items}
+                  pageNumber={pageIdx + 1}
+                  totalPages={totalPages}
                 />
               ))}
-              <AnswerKeyPage groups={answerGroups} total={items.length} />
+              {answerGroups.length > 0 && (
+                <AnswerKeyPage
+                  groups={answerGroups}
+                  total={items.length}
+                  pageNumber={totalPages}
+                  totalPages={totalPages}
+                />
+              )}
             </>
           )}
         </div>
@@ -148,116 +175,180 @@ export default function PrintPreview({ onClose }) {
  * Pages
  * ───────────────────────────────────────────────────────────────────── */
 
-function ProblemPage({ title, isFirstPage, chapter, items }) {
+const pageStyle = {
+  width: `${PAGE_WIDTH_MM}mm`,
+  height: `${PAGE_HEIGHT_MM}mm`,
+  background: C.paper,
+  position: 'relative',
+  padding: '12mm 14mm 10mm',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  color: C.ink,
+  fontFamily: FONT_SANS,
+  fontFeatureSettings: '"ss01" on, "ss02" on, "calt" on',
+  WebkitFontSmoothing: 'antialiased',
+  MozOsxFontSmoothing: 'grayscale',
+  boxShadow:
+    '0 1px 0 rgba(0,0,0,.04), 0 12px 32px -12px rgba(0,0,0,.18), 0 2px 6px -2px rgba(0,0,0,.06)',
+};
+
+function ProblemPage({
+  title,
+  isFirstPage,
+  unitCode,
+  unitName,
+  unitNameForFooter,
+  items,
+  pageNumber,
+  totalPages,
+}) {
   return (
-    <article data-pdf-page className="bg-white shadow-card" style={pageStyle}>
-      <PageHeader isFirstPage={isFirstPage} title={title} chapter={chapter} />
+    <article data-pdf-page style={pageStyle}>
+      <PageHeader
+        isFirstPage={isFirstPage}
+        title={title}
+        unitCode={unitCode}
+        unitName={unitName}
+      />
       <QuadrantGrid items={items} />
+      <PageFooter
+        unitCode={unitCode || ''}
+        unitName={unitNameForFooter}
+        pageNumber={pageNumber}
+        totalPages={totalPages}
+      />
     </article>
   );
 }
 
-const pageStyle = {
-  width: `${PAGE_WIDTH_MM}mm`,
-  height: `${PAGE_HEIGHT_MM}mm`,
-  padding: `${PAGE_PADDING_MM}mm`,
-  boxSizing: 'border-box',
-  display: 'flex',
-  flexDirection: 'column',
-  color: '#0f172a',
-  overflow: 'hidden',
-};
-
-function PageHeader({ isFirstPage, title, chapter }) {
+function PageHeader({ isFirstPage, title, unitCode, unitName }) {
   return (
-    <header
-      style={{
-        flexShrink: 0,
-        marginBottom: '4mm',
-        paddingBottom: '2mm',
-        borderBottom: '1px solid #cbd5e1',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '2mm',
-      }}
-    >
-      {/* Title row — page 1 only, but the slot is always reserved so the
-          quadrant grid below stays at the same height on every page. */}
+    <header style={{ marginBottom: '4mm', flexShrink: 0 }}>
+      {isFirstPage && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'auto 1fr',
+            alignItems: 'center',
+            gap: '14mm',
+            paddingBottom: '5mm',
+            marginBottom: '4mm',
+            borderBottom: `1px solid ${C.ink}`,
+          }}
+        >
+          <h1
+            style={{
+              margin: 0,
+              fontSize: '22pt',
+              fontWeight: 800,
+              letterSpacing: '-0.05em',
+              lineHeight: 1,
+              color: C.ink,
+            }}
+          >
+            {title || '오답 노트'}
+          </h1>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12mm' }}>
+            <FieldGroup label="Name" />
+            <FieldGroup label="Date" />
+          </div>
+        </div>
+      )}
+
+      {/* Unit row — fixed height on every page (blank when continuing) */}
       <div
         style={{
-          height: '14mm',
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          gap: '8mm',
-        }}
-      >
-        {isFirstPage ? (
-          <>
-            <div
-              style={{
-                fontSize: '22pt',
-                fontWeight: 700,
-                color: '#0f172a',
-                lineHeight: 1,
-              }}
-            >
-              {title || '오답 노트'}
-            </div>
-            <div
-              style={{
-                fontSize: '10pt',
-                textAlign: 'right',
-                lineHeight: 1.7,
-                color: '#0f172a',
-              }}
-            >
-              <div>
-                Name
-                <span
-                  style={{
-                    display: 'inline-block',
-                    minWidth: '50mm',
-                    borderBottom: '1px solid #475569',
-                    marginLeft: '6pt',
-                  }}
-                />
-              </div>
-              <div>
-                Date
-                <span
-                  style={{
-                    display: 'inline-block',
-                    minWidth: '50mm',
-                    borderBottom: '1px solid #475569',
-                    marginLeft: '6pt',
-                  }}
-                />
-              </div>
-            </div>
-          </>
-        ) : null}
-      </div>
-      {/* Chapter row — always reserved; blank when this page continues a
-          chapter that already started earlier. */}
-      <div
-        style={{
-          fontSize: '14pt',
-          fontWeight: 700,
-          color: '#0f172a',
-          height: '8mm',
           display: 'flex',
           alignItems: 'center',
+          gap: '5mm',
+          height: '8mm',
         }}
       >
-        {chapter || ' '}
+        {unitCode && (
+          <>
+            <span
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: '8pt',
+                letterSpacing: '0.28em',
+                textTransform: 'uppercase',
+                color: C.ink4,
+              }}
+            >
+              Unit
+            </span>
+            <span
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: '11pt',
+                fontWeight: 500,
+                color: C.ink,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {unitCode}
+            </span>
+            <span
+              style={{
+                display: 'inline-block',
+                width: '3mm',
+                height: '1px',
+                background: C.ink4,
+                transform: 'translateY(-2px)',
+              }}
+            />
+            <span
+              style={{
+                fontSize: '12pt',
+                fontWeight: 700,
+                color: C.ink,
+                letterSpacing: '-0.015em',
+              }}
+            >
+              {unitName}
+            </span>
+          </>
+        )}
       </div>
     </header>
   );
 }
 
+function FieldGroup({ label }) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'auto 1fr',
+        alignItems: 'end',
+        gap: '4mm',
+        minWidth: '70mm',
+      }}
+    >
+      <span
+        style={{
+          fontFamily: FONT_MONO,
+          fontSize: '8pt',
+          textTransform: 'uppercase',
+          letterSpacing: '0.28em',
+          color: C.ink3,
+          lineHeight: 1,
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          height: '6mm',
+          borderBottom: `1px solid ${C.ink}`,
+        }}
+      />
+    </div>
+  );
+}
+
 function QuadrantGrid({ items }) {
-  // Always render a 2x2 grid; empty slots stay blank so layout is consistent
   const slots = [0, 1, 2, 3].map((i) => items[i] || null);
   return (
     <div
@@ -266,162 +357,304 @@ function QuadrantGrid({ items }) {
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
         gridTemplateRows: '1fr 1fr',
-        gap: `${QUADRANT_GAP_MM}mm`,
-        minHeight: 0,
+        borderTop: `1px solid ${C.ink}`,
+        borderBottom: `1px solid ${C.hair}`,
+        position: 'relative',
       }}
     >
+      {/* Faint cross dividers (hair-soft) */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: '50%',
+          width: '1px',
+          background: C.hairSoft,
+          pointerEvents: 'none',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: '50%',
+          height: '1px',
+          background: C.hairSoft,
+          pointerEvents: 'none',
+        }}
+      />
       {slots.map((id, idx) => (
-        <Quadrant key={idx} id={id} />
+        <Cell key={idx} id={id} />
       ))}
     </div>
   );
 }
 
-function Quadrant({ id }) {
-  if (!id) {
-    return <div />;
-  }
-  const parsed = parseProblemId(id);
-  if (!parsed) return <div />;
-  const src = buildImageUrl(parsed.category, parsed.number);
+function Cell({ id }) {
   return (
     <div
       style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'flex-start',
+        position: 'relative',
+        padding: '7mm 8mm 8mm 7mm',
         overflow: 'hidden',
+        background: C.paper,
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
-      <ProblemImageBox src={src} alt={id} />
+      {id && <ProblemImage id={id} />}
     </div>
   );
 }
 
-/**
- * Image renders inside an IMAGE_WIDTH_MM × IMAGE_MAX_HEIGHT_MM box,
- * fitting fully (aspect preserved). If its natural aspect makes the
- * proportional height exceed the box, it shrinks uniformly so both
- * dimensions fit.
- */
-function ProblemImageBox({ src, alt }) {
+function ProblemImage({ id }) {
+  const parsed = parseProblemId(id);
+  if (!parsed) return null;
+  const src = buildImageUrl(parsed.category, parsed.number);
   return (
     <img
       src={src}
-      alt={alt}
+      alt={id}
       crossOrigin="anonymous"
       loading="eager"
       decoding="async"
       style={{
         display: 'block',
-        maxWidth: `${IMAGE_WIDTH_MM}mm`,
-        maxHeight: `${IMAGE_MAX_HEIGHT_MM}mm`,
+        alignSelf: 'flex-start',
+        maxWidth: '40%',
+        maxHeight: '80%',
         width: 'auto',
         height: 'auto',
-        flexShrink: 0,
         objectFit: 'contain',
       }}
     />
   );
 }
 
+function PageFooter({ unitCode, unitName, pageNumber, totalPages }) {
+  const left = unitCode
+    ? `오답 노트 · Unit ${unitCode}`
+    : unitName
+      ? `오답 노트 · ${unitName}`
+      : '오답 노트';
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: '6mm',
+        left: '14mm',
+        right: '14mm',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        fontFamily: FONT_MONO,
+        fontSize: '7.5pt',
+        letterSpacing: '0.28em',
+        textTransform: 'uppercase',
+        color: C.ink4,
+      }}
+    >
+      <span>{left}</span>
+      <span style={{ color: C.ink2, letterSpacing: '0.16em' }}>
+        <b style={{ color: C.ink, fontWeight: 500 }}>{pad2(pageNumber)}</b>
+        &nbsp;/&nbsp;{pad2(totalPages)}
+      </span>
+    </div>
+  );
+}
+
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
 /* ─────────────────────────────────────────────────────────────────────
- * Answer key — one section per chapter, stacked top-to-bottom.
- * Entries inside each section flow in a 2-column grid (row-major).
+ * Answer key (last page) — column-count: 2, one section per chapter
  * ───────────────────────────────────────────────────────────────────── */
 
-function AnswerKeyPage({ groups, total }) {
-  if (groups.length === 0) return null;
+function AnswerKeyPage({ groups, total, pageNumber, totalPages }) {
   return (
-    <article data-pdf-page className="bg-white shadow-card" style={pageStyle}>
-      <div
-        style={{
-          flexShrink: 0,
-          marginBottom: '5mm',
-          paddingBottom: '3mm',
-          borderBottom: '1.5px solid #0f172a',
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-        }}
-      >
-        <h2 className="text-[20pt] font-bold leading-tight text-slate-900">정답</h2>
-        <div className="text-[10pt] text-slate-500">총 {total}문항</div>
-      </div>
+    <article data-pdf-page style={pageStyle}>
+      <header style={{ marginBottom: '4mm', flexShrink: 0 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto',
+            alignItems: 'end',
+            gap: '14mm',
+            paddingBottom: '6mm',
+            borderBottom: `1px solid ${C.ink}`,
+          }}
+        >
+          <div>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: '22pt',
+                fontWeight: 800,
+                letterSpacing: '-0.05em',
+                lineHeight: 1,
+                color: C.ink,
+              }}
+            >
+              정답
+            </h1>
+          </div>
+          <div
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: '8pt',
+              color: C.ink3,
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              textAlign: 'right',
+              alignSelf: 'end',
+            }}
+          >
+            Total {pad2(total)}
+          </div>
+        </div>
+      </header>
+
       <div
         style={{
           flex: 1,
+          columnCount: 2,
+          columnGap: '14mm',
+          padding: '4mm 0',
           minHeight: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '7mm',
         }}
       >
-        {groups.map((group) => (
-          <ChapterAnswerSection
+        {groups.map((group, idx) => (
+          <AnswerGroup
             key={group.category}
-            chapter={group.chapter}
+            unitCode={group.unitCode}
+            unitName={group.unitName}
             entries={group.items}
+            isLast={idx === groups.length - 1}
           />
         ))}
       </div>
+
+      <PageFooter
+        unitCode={null}
+        unitName="정답지"
+        pageNumber={pageNumber}
+        totalPages={totalPages}
+      />
     </article>
   );
 }
 
-function ChapterAnswerSection({ chapter, entries }) {
+function AnswerGroup({ unitCode, unitName, entries, isLast }) {
   return (
-    <section>
-      <div
+    <section
+      style={{
+        breakInside: 'avoid',
+        pageBreakInside: 'avoid',
+        marginBottom: isLast ? 0 : '10pt',
+      }}
+    >
+      <header
         style={{
-          fontSize: '13pt',
-          fontWeight: 700,
-          color: '#0f172a',
-          marginBottom: '3mm',
-          paddingBottom: '2pt',
-          borderBottom: '1.5px solid #0f172a',
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: '4mm',
+          borderBottom: `1.5px solid ${C.ink}`,
+          paddingBottom: '2mm',
+          marginBottom: '4mm',
+          breakAfter: 'avoid-column',
+          pageBreakAfter: 'avoid',
+          wordBreak: 'keep-all',
         }}
       >
-        {chapter}
-      </div>
-      <div
+        <span
+          style={{
+            fontFamily: FONT_MONO,
+            fontSize: '11pt',
+            fontWeight: 600,
+            color: C.ink,
+            letterSpacing: '-0.01em',
+            flexShrink: 0,
+          }}
+        >
+          {unitCode}
+        </span>
+        <span
+          style={{
+            fontSize: '11.5pt',
+            fontWeight: 700,
+            color: C.ink,
+            letterSpacing: '-0.015em',
+            wordBreak: 'keep-all',
+            flex: 1,
+          }}
+        >
+          {unitName}
+        </span>
+        <span
+          style={{
+            flexShrink: 0,
+            fontFamily: FONT_MONO,
+            fontSize: '8pt',
+            color: C.ink4,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {pad2(entries.length)} items
+        </span>
+      </header>
+      <ol
         style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
           display: 'grid',
-          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-          columnGap: '14mm',
-          rowGap: '4pt',
+          gridTemplateColumns: '1fr 1fr',
+          columnGap: '6mm',
+          rowGap: '2.5mm',
         }}
       >
-        {entries.map(({ id, number }) => (
-          <div
+        {entries.map(({ id, displayNumber }) => (
+          <li
             key={id}
             style={{
-              display: 'flex',
+              display: 'grid',
+              gridTemplateColumns: '5mm 1fr',
               alignItems: 'baseline',
-              gap: '6pt',
+              gap: '3mm',
               fontSize: '10.5pt',
-              lineHeight: 1.55,
-              color: '#0f172a',
+              color: C.ink,
+              lineHeight: 1.3,
               minWidth: 0,
             }}
           >
             <span
               style={{
-                fontWeight: 700,
-                color: '#1d4ed8',
-                minWidth: '8mm',
-                flexShrink: 0,
-                textAlign: 'right',
+                fontFamily: FONT_MONO,
+                fontWeight: 600,
+                color: C.ink,
+                fontVariantNumeric: 'tabular-nums',
               }}
             >
-              {number}.
+              {displayNumber}.
             </span>
-            <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
+            <span
+              style={{
+                fontWeight: 500,
+                color: C.ink,
+                letterSpacing: '-0.01em',
+                minWidth: 0,
+                wordBreak: 'break-word',
+              }}
+            >
               <AnswerText value={ANSWERS[id]} />
             </span>
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
     </section>
   );
 }
@@ -442,7 +675,7 @@ function Spinner() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * Helpers: chunk by chapter, then annotate page-level chapter heading
+ * Pagination + chapter helpers
  * ───────────────────────────────────────────────────────────────────── */
 
 function chunkByChapter(items, perPage) {
@@ -464,23 +697,34 @@ function chunkByChapter(items, perPage) {
   return pages;
 }
 
+/**
+ * For each page, attach the unit header that should appear on it.
+ * Only the FIRST page of a unit gets `unitCode`/`unitName` populated;
+ * subsequent pages of the same unit show blank (but reserved) header.
+ * `unitNameForFooter` is the unit name for the page footer (always set).
+ */
 function annotatePages(pages) {
   const seen = new Set();
   return pages.map((items) => {
-    const cat = parseProblemId(items[0])?.category;
+    const parsed = parseProblemId(items[0]);
+    const cat = parsed?.category;
+    const unitName = CHAPTERS[cat] ? extractUnitName(CHAPTERS[cat]) : null;
+    const unitCode = CHAPTERS[cat] ? extractUnitCode(CHAPTERS[cat]) : null;
     const isFirstOfChapter = cat && !seen.has(cat);
     if (isFirstOfChapter) seen.add(cat);
     return {
       items,
-      chapter: isFirstOfChapter ? CHAPTERS[cat] || cat : null,
+      unitCode: isFirstOfChapter ? unitCode : null,
+      unitName: isFirstOfChapter ? unitName : null,
+      unitNameForFooter: unitName,
     };
   });
 }
 
 /**
- * Group answer-key entries by chapter, in cart order. Items are already
- * sorted by category then number (see compareProblemIds), so a category
- * boundary always opens a new group.
+ * Group answer-key entries by chapter, in cart order. Each entry is
+ * given a `displayNumber` (1, 2, 3 …) relative to its chapter so the
+ * answer key uses simple in-chapter indices.
  */
 function groupAnswerEntriesByChapter(items) {
   const groups = [];
@@ -489,20 +733,32 @@ function groupAnswerEntriesByChapter(items) {
     const parsed = parseProblemId(id);
     if (!parsed) continue;
     if (!current || current.category !== parsed.category) {
+      const chapter = CHAPTERS[parsed.category] || parsed.category;
       current = {
         category: parsed.category,
-        chapter: CHAPTERS[parsed.category] || parsed.category,
+        unitCode: extractUnitCode(chapter) || parsed.category,
+        unitName: extractUnitName(chapter) || '',
         items: [],
       };
       groups.push(current);
     }
-    current.items.push({ id, number: parsed.number });
+    current.items.push({ id, displayNumber: current.items.length + 1 });
   }
   return groups;
 }
 
+/** "09 이차부등식과 연립이차부등식" → "09" */
+function extractUnitCode(chapter) {
+  const m = chapter.match(/^(\d+)/);
+  return m ? m[1] : null;
+}
+/** "09 이차부등식과 연립이차부등식" → "이차부등식과 연립이차부등식" */
+function extractUnitName(chapter) {
+  return chapter.replace(/^\d+\s+/, '');
+}
+
 /* ─────────────────────────────────────────────────────────────────────
- * PDF generation
+ * PDF generation: html2canvas + jsPDF (landscape)
  * ───────────────────────────────────────────────────────────────────── */
 
 async function generatePdf({ title }) {

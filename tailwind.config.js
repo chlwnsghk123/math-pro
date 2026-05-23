@@ -22,7 +22,8 @@ export default {
       },
       fontFamily: {
         sans: [
-          '"Pretendard"',
+          '"Pretendard Variable"',
+          'Pretendard',
           '-apple-system',
           'BlinkMacSystemFont',
           '"Segoe UI"',
@@ -30,6 +31,15 @@ export default {
           '"Helvetica Neue"',
           'Arial',
           'sans-serif',
+        ],
+        mono: [
+          '"IBM Plex Mono"',
+          'ui-monospace',
+          'SFMono-Regular',
+          'Menlo',
+          'Monaco',
+          'Consolas',
+          'monospace',
         ],
       },
     },
