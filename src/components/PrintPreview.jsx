@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useCartStore } from '../store/cartStore.js';
 import { buildImageUrl, CHAPTERS, parseProblemId } from '../config.js';
 import ANSWERS from '../data/answers.js';
@@ -26,21 +26,7 @@ export default function PrintPreview({ onClose }) {
   }, [title]);
 
   /** First problem of each category gets a chapter label. */
-  const annotated = useMemo(() => {
-    const seen = new Set();
-    return items.map((id) => {
-      const parsed = parseProblemId(id);
-      const cat = parsed?.category;
-      const isFirstOfChapter = cat && !seen.has(cat);
-      if (isFirstOfChapter) seen.add(cat);
-      return {
-        id,
-        category: cat,
-        number: parsed?.number,
-        chapter: isFirstOfChapter ? CHAPTERS[cat] || cat : null,
-      };
-    });
-  }, [items]);
+  const annotated = useMemo(() => annotateWithChapters(items), [items]);
 
   const pages = useMemo(() => {
     const chunks = [];
@@ -134,7 +120,7 @@ export default function PrintPreview({ onClose }) {
                   problems={chunk}
                 />
               ))}
-              <AnswerKeyPage items={items} />
+              <AnswerKeyPage annotated={annotated} />
             </>
           )}
         </div>
@@ -238,51 +224,94 @@ function CroppedImage({ src, alt, cropRight }) {
   );
 }
 
-function AnswerKeyPage({ items }) {
-  if (items.length === 0) return null;
+function AnswerKeyPage({ annotated }) {
+  if (annotated.length === 0) return null;
   return (
     <article data-pdf-page className="bg-white shadow-card" style={pageStyle}>
       <div className="mb-4 flex items-end justify-between border-b border-slate-900 pb-2">
         <h2 className="text-[20pt] font-bold leading-tight text-slate-900">정답</h2>
-        <div className="text-[10pt] text-slate-500">총 {items.length}문항</div>
+        <div className="text-[10pt] text-slate-500">총 {annotated.length}문항</div>
       </div>
       <div
         style={{
           columnCount: 2,
           columnGap: '12mm',
-          columnRule: '1px solid #e2e8f0',
         }}
       >
-        {items.map((id) => (
-          <div
-            key={id}
-            style={{
-              breakInside: 'avoid',
-              marginBottom: '6pt',
-              paddingBottom: '4pt',
-              borderBottom: '1px dashed #e2e8f0',
-              fontSize: '11pt',
-              lineHeight: 1.55,
-              color: '#0f172a',
-            }}
-          >
-            <span
+        {annotated.map((it, idx) => (
+          <Fragment key={it.id}>
+            {it.chapter && (
+              <div
+                style={{
+                  fontSize: '12pt',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  marginTop: idx === 0 ? 0 : '10pt',
+                  marginBottom: '5pt',
+                  paddingBottom: '3pt',
+                  borderBottom: '1.5px solid #0f172a',
+                  breakAfter: 'avoid-column',
+                  pageBreakAfter: 'avoid',
+                }}
+              >
+                {it.chapter}
+              </div>
+            )}
+            <div
               style={{
-                display: 'inline-block',
-                minWidth: '12mm',
-                fontWeight: 700,
-                color: '#1d4ed8',
-                marginRight: '6pt',
+                breakInside: 'avoid',
+                pageBreakInside: 'avoid',
+                marginBottom: '4pt',
+                fontSize: '11pt',
+                lineHeight: 1.55,
+                color: '#0f172a',
+                display: 'flex',
+                gap: '6pt',
+                alignItems: 'baseline',
               }}
             >
-              {id}
-            </span>
-            <AnswerText value={ANSWERS[id]} />
-          </div>
+              <span
+                style={{
+                  fontWeight: 700,
+                  color: '#1d4ed8',
+                  minWidth: '9mm',
+                  flexShrink: 0,
+                  textAlign: 'right',
+                }}
+              >
+                {it.number}.
+              </span>
+              <span style={{ flex: 1 }}>
+                <AnswerText value={ANSWERS[it.id]} />
+              </span>
+            </div>
+          </Fragment>
         ))}
       </div>
     </article>
   );
+}
+
+/**
+ * Annotate cart items in order. Each entry carries its parsed
+ * category/number plus a `chapter` label that is non-null only on the
+ * first item of each category (so the chapter heading is shown once
+ * per category in both the problem pages and the answer key).
+ */
+function annotateWithChapters(items) {
+  const seen = new Set();
+  return items.map((id) => {
+    const parsed = parseProblemId(id);
+    const cat = parsed?.category;
+    const isFirstOfChapter = cat && !seen.has(cat);
+    if (isFirstOfChapter) seen.add(cat);
+    return {
+      id,
+      category: cat,
+      number: parsed?.number,
+      chapter: isFirstOfChapter ? CHAPTERS[cat] || cat : null,
+    };
+  });
 }
 
 function Spinner() {
