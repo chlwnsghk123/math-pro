@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Math Pro — 사용 안내</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  :root {
+    --ink:    #161616;
+    --ink-2:  #3d3d3d;
+    --ink-3:  #6f6f6f;
+    --ink-4:  #a8a8a8;
+    --hair:   #e5e5e2;
+    --paper:  #ffffff;
+    --stage:  #f6f5f1;
+    --brand:  #3B82F6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--stage);
+    color: var(--ink);
+    font-family: "Pretendard Variable", Pretendard, -apple-system, system-ui, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 64px 28px 96px;
+  }
+  header.intro {
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 32px;
+    margin-bottom: 48px;
+  }
+  .pill {
+    display: inline-block;
+    background: var(--ink);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    letter-spacing: 0.12em;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin: 0 0 12px;
+    line-height: 1.1;
+  }
+  .tagline {
+    color: var(--ink-3);
+    font-size: 17px;
+    margin: 0;
+    max-width: 560px;
+  }
+
+  section {
+    margin-bottom: 56px;
+  }
+  h2 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 20px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--hair);
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 24px 0 6px;
+  }
+  p { margin: 0 0 12px; color: var(--ink-2); }
+  p.lead { color: var(--ink-2); font-size: 16px; }
+
+  ol.steps {
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  @media (min-width: 720px) {
+    ol.steps { grid-template-columns: 1fr 1fr 1fr; }
+  }
+  ol.steps li {
+    background: var(--paper);
+    border: 1px solid var(--hair);
+    border-radius: 14px;
+    padding: 18px 18px 20px;
+    counter-increment: step;
+    position: relative;
+  }
+  ol.steps li::before {
+    content: counter(step, decimal-leading-zero);
+    display: block;
+    font-family: ui-monospace, "IBM Plex Mono", Menlo, monospace;
+    font-size: 12px;
+    color: var(--ink-4);
+    letter-spacing: 0.15em;
+    margin-bottom: 10px;
+  }
+  ol.steps li h4 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  ol.steps li p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--ink-3);
+    line-height: 1.55;
+  }
+
+  table.spec {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-top: 8px;
+  }
+  table.spec th, table.spec td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--hair);
+    vertical-align: top;
+  }
+  table.spec th {
+    color: var(--ink-3);
+    font-weight: 600;
+    width: 30%;
+    white-space: nowrap;
+  }
+  table.spec code, code.kbd {
+    font-family: ui-monospace, "IBM Plex Mono", Menlo, monospace;
+    background: #efeee9;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.92em;
+  }
+
+  ul.bullets {
+    margin: 0;
+    padding-left: 18px;
+    color: var(--ink-2);
+  }
+  ul.bullets li { margin-bottom: 6px; }
+  ul.bullets li strong { color: var(--ink); }
+
+  details.faq {
+    background: var(--paper);
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+  }
+  details.faq summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--ink);
+    list-style: none;
+  }
+  details.faq summary::-webkit-details-marker { display: none; }
+  details.faq summary::after {
+    content: "+";
+    float: right;
+    color: var(--ink-4);
+    font-family: ui-monospace, "IBM Plex Mono", Menlo, monospace;
+    font-weight: 400;
+  }
+  details.faq[open] summary::after { content: "−"; }
+  details.faq[open] summary { margin-bottom: 10px; }
+  details.faq p {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .callout {
+    background: #eef4ff;
+    border-left: 3px solid var(--brand);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 14px;
+    color: #1d4ed8;
+    margin: 16px 0 0;
+  }
+
+  .diagram {
+    background: var(--paper);
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    padding: 18px;
+    font-family: ui-monospace, "IBM Plex Mono", Menlo, monospace;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    white-space: pre;
+    overflow-x: auto;
+    line-height: 1.5;
+  }
+
+  footer.bottom {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--hair);
+    font-size: 12px;
+    color: var(--ink-4);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="intro">
+    <span class="pill">사용 안내</span>
+    <h1>Math Pro <span style="color:var(--ink-3); font-weight:500;">— 오답노트 생성기</span></h1>
+    <p class="tagline">
+      틀린 문제만 골라 오답노트를 만들고, 가로 A4 인쇄용 PDF로 저장하세요.
+      이미지 기반 문제 + KaTeX로 조판된 정답지가 함께 출력됩니다.
+    </p>
+  </header>
+
+  <!-- 1. 빠른 사용법 ─────────────────────── -->
+  <section>
+    <h2>1. 3단계로 시작하기</h2>
+    <ol class="steps">
+      <li>
+        <h4>문제 담기</h4>
+        <p>학년 탭(7~12)에서 문제를 클릭해 장바구니에 담거나, 상단 검색창에
+          <code>9-30</code>처럼 입력해 바로 추가합니다.</p>
+      </li>
+      <li>
+        <h4>오답노트 생성</h4>
+        <p>장바구니에서 <strong>오답노트 생성</strong>을 누르고 제목·이름·날짜를 입력하면
+          노트가 저장됩니다. 장바구니는 자동으로 비워져요.</p>
+      </li>
+      <li>
+        <h4>인쇄 / PDF</h4>
+        <p>상단의 <strong>내 오답노트</strong>에서 노트를 열고 <strong>인쇄 / PDF</strong>를
+          누르세요. 브라우저 인쇄 창에서 PDF 저장 또는 실제 인쇄가 가능합니다.</p>
+      </li>
+    </ol>
+  </section>
+
+  <!-- 2. 화면 안내 ─────────────────────── -->
+  <section>
+    <h2>2. 화면 구성</h2>
+
+    <h3>메인 화면</h3>
+    <p>
+      좌측은 선택한 학년의 문제 그리드, 우측은 장바구니 사이드바입니다.
+      모바일에서는 사이드바 대신 하단 바텀시트가 뜹니다.
+    </p>
+    <ul class="bullets">
+      <li><strong>학년 탭</strong> — 07~12학년. 탭마다 현재 등록된 문제 수가 함께 표시됩니다.</li>
+      <li><strong>검색창</strong> — 문제 번호로 즉시 추가. 자동완성 지원.</li>
+      <li><strong>장바구니</strong> — 담은 순서와 무관하게 항상 학년·번호 순으로 정렬됩니다.</li>
+      <li><strong>내 오답노트 (N)</strong> — 저장한 오답노트 목록으로 이동.</li>
+    </ul>
+
+    <h3>오답노트 미리보기</h3>
+    <p>가로 A4 (297×210mm) 한 페이지를 2×2 사분면으로 나눠 한 사분면당
+      한 문제씩 배치합니다. 단원이 바뀌면 자동으로 새 페이지로 넘어가요.</p>
+
+    <div class="diagram">┌─────────────────────────────────────────────────┐
+│ 오답 노트                       NAME ____________ │   ← 1페이지만
+│                                 DATE ____________ │
+│ UNIT 09 ─ 이차부등식과 연립이차부등식              │   ← 각 단원의 첫 페이지에만
+│ ───────────────────────────────────────────────  │
+│ ┌────────┐         · · ·     ┌────────┐  · · ·   │
+│ │ 문제   │   풀이 공간        │ 문제   │  풀이 공간│
+│ │ 이미지 │                    │ 이미지 │           │
+│ └────────┘                    └────────┘          │
+│       · · ·                       · · ·           │
+│                                                   │
+│ ┌────────┐  · · ·             ┌────────┐  · · ·   │
+│ │ 문제   │   풀이 공간        │ 문제   │  풀이 공간│
+│ │ 이미지 │                    │ 이미지 │           │
+│ └────────┘                    └────────┘          │
+│                                                   │
+│ 오답 노트 · UNIT 09                       01 / 04 │
+└─────────────────────────────────────────────────┘</div>
+
+    <h3>정답지 (마지막 페이지)</h3>
+    <p>전체 문항의 답을 2단으로 단원별 그룹화해서 모아둡니다. 번호는
+      교재 그대로 (<code>9-15</code>의 답은 <code>15.</code>로) 표시돼요.</p>
+  </section>
+
+  <!-- 3. 저장 / 복귀 동작 ─────────────────────── -->
+  <section>
+    <h2>3. 어떤 데이터가 어디 저장되나요?</h2>
+
+    <table class="spec">
+      <tr>
+        <th>장바구니</th>
+        <td>이번 세션 동안만 유지. <strong>새로고침하면 비워집니다.</strong></td>
+      </tr>
+      <tr>
+        <th>저장된 오답노트</th>
+        <td>브라우저 localStorage에 저장됩니다 <code>(math-pro:notebooks-v1)</code>.
+          새로고침해도 유지되고, 같은 브라우저·기기에서 다시 열 수 있어요.</td>
+      </tr>
+      <tr>
+        <th>제목·이름 기본값</th>
+        <td>마지막에 입력한 값이 다음 모달의 기본값으로 채워집니다. 날짜는
+          매번 오늘로 초기화돼요.</td>
+      </tr>
+      <tr>
+        <th>문제 이미지</th>
+        <td>GitHub 저장소의 <code>main</code> 브랜치 <code>images/</code> 폴더에서
+          직접 불러옵니다. 앱 자체에 내장되어 있지 않아 추가 업로드가
+          반영되려면 main에 푸시되어 있어야 해요.</td>
+      </tr>
+      <tr>
+        <th>PDF 파일</th>
+        <td>브라우저의 "PDF로 저장" 기능을 사용합니다. 파일명은
+          <code>제목-이름-날짜.pdf</code>로 자동 채워져요 (이름이 비어있어도 OK).</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- 4. 인쇄 팁 ─────────────────────── -->
+  <section>
+    <h2>4. 인쇄 / PDF 저장 팁</h2>
+
+    <p class="lead">"PDF 저장" 버튼은 브라우저의 시스템 인쇄 창을 띄웁니다.
+      거기서 PDF로 저장하거나 실제 프린터로 출력할 수 있어요.</p>
+
+    <ul class="bullets">
+      <li><strong>용지</strong> — A4, 가로(Landscape), 여백 "없음"으로 설정하세요.</li>
+      <li><strong>대상</strong> — "PDF로 저장(Save as PDF)"을 선택하면 파일이 다운로드됩니다.</li>
+      <li><strong>머리글·바닥글</strong> — 인쇄 대화상자의 <em>"머리글/바닥글"</em>
+        체크박스를 해제하면 브라우저가 추가하는 URL·날짜가 사라지고
+        앱의 푸터만 남습니다.</li>
+      <li><strong>배경 그래픽</strong> — 일부 브라우저는 기본 OFF인데, 이 앱은
+        배경 색이 거의 없어 영향을 받지 않습니다.</li>
+    </ul>
+
+    <div class="callout">
+      💡 미리보기 화면에 보이는 모습이 그대로 출력됩니다. KaTeX 수식과
+      얇은 선이 캡쳐 단계에서 깨지지 않도록 브라우저 네이티브 인쇄를 사용해요.
+    </div>
+  </section>
+
+  <!-- 5. FAQ ─────────────────────── -->
+  <section>
+    <h2>5. FAQ</h2>
+
+    <details class="faq" open>
+      <summary>새로고침하면 담아둔 문제가 사라져요</summary>
+      <p>맞아요. 의도된 동작입니다. 장바구니는 "이번 세션의 임시 작업대"라서
+        새로고침하면 비워집니다. 보존하려면 <strong>오답노트 생성</strong>으로
+        스냅샷을 만들어두세요 — 그건 영구 저장됩니다.</p>
+    </details>
+
+    <details class="faq">
+      <summary>이미지가 "이미지 로드 실패"라고 떠요</summary>
+      <p>GitHub 저장소의 <code>images/&lt;학년&gt;/&lt;번호&gt;.png</code>가 아직
+        업로드되지 않았을 가능성이 큽니다. 학년 폴더는 두 자리 (07, 08, …),
+        파일은 세 자리 (001.png) 형식이에요.</p>
+    </details>
+
+    <details class="faq">
+      <summary>오답노트의 제목·이름·날짜를 나중에 바꿀 수 있나요?</summary>
+      <p>네. <strong>내 오답노트</strong>에서 해당 오답노트를 열면 상단 입력란에서
+        바로 수정 가능합니다. 수정은 자동 저장돼요. 단, 담긴 문제 목록은
+        생성 시점에 확정되어 변경할 수 없어요 — 새 오답노트를 만드세요.</p>
+    </details>
+
+    <details class="faq">
+      <summary>오답노트는 어떤 기기에서 볼 수 있나요?</summary>
+      <p>저장은 브라우저의 localStorage 기반이라 <strong>같은 브라우저, 같은 기기</strong>에서만
+        보입니다. 다른 기기로 옮기려면 PDF로 저장해서 공유해주세요.</p>
+    </details>
+
+    <details class="faq">
+      <summary>특정 문제의 답이 틀린 것 같아요</summary>
+      <p>답은 <code>src/data/answers.js</code>에 키-값으로 저장돼 있습니다. 해당 항목을
+        수정하고 main 브랜치에 커밋하면 다음 빌드부터 반영돼요.</p>
+    </details>
+
+    <details class="faq">
+      <summary>새로운 학년·단원을 추가하고 싶어요</summary>
+      <p>두 곳을 손봐야 합니다. (1) <code>src/config.js</code>의 <code>CATEGORIES</code>와
+        <code>CHAPTERS</code>에 학년·단원명을 추가, (2) <code>src/data/answers.js</code>에
+        새 학년의 답안 키를 추가. 이미지는 GitHub의 <code>images/&lt;학년&gt;/</code>
+        폴더에 업로드하면 자동으로 보입니다.</p>
+    </details>
+  </section>
+
+  <footer class="bottom">
+    Math Pro · 자세한 개발 문서는 저장소 루트의
+    <code>CLAUDE.md</code> 와 <code>docs/</code> 를 참고하세요.
+  </footer>
+
+</div>
+
+</body>
+</html>

@@ -146,7 +146,6 @@ export default function PrintPreview({ notebook, onClose }) {
               {answerGroups.length > 0 && (
                 <AnswerKeyPage
                   groups={answerGroups}
-                  total={items.length}
                   pageNumber={totalPages}
                   totalPages={totalPages}
                 />
@@ -498,47 +497,28 @@ function pad2(n) {
  * Answer key (last page) — column-count: 2, one section per chapter
  * ───────────────────────────────────────────────────────────────────── */
 
-function AnswerKeyPage({ groups, total, pageNumber, totalPages }) {
+function AnswerKeyPage({ groups, pageNumber, totalPages }) {
   return (
     <article data-pdf-page style={pageStyle}>
       <header style={{ marginBottom: '4mm', flexShrink: 0 }}>
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr auto',
-            alignItems: 'end',
-            gap: '14mm',
             paddingBottom: '6mm',
             borderBottom: `1px solid ${C.ink}`,
           }}
         >
-          <div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: '22pt',
-                fontWeight: 800,
-                letterSpacing: '-0.05em',
-                lineHeight: 1,
-                color: C.ink,
-              }}
-            >
-              정답
-            </h1>
-          </div>
-          <div
+          <h1
             style={{
-              fontFamily: FONT_MONO,
-              fontSize: '8pt',
-              color: C.ink3,
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-              textAlign: 'right',
-              alignSelf: 'end',
+              margin: 0,
+              fontSize: '22pt',
+              fontWeight: 800,
+              letterSpacing: '-0.05em',
+              lineHeight: 1,
+              color: C.ink,
             }}
           >
-            Total {pad2(total)}
-          </div>
+            정답
+          </h1>
         </div>
       </header>
 
@@ -617,18 +597,6 @@ function AnswerGroup({ unitCode, unitName, entries, isLast }) {
           }}
         >
           {unitName}
-        </span>
-        <span
-          style={{
-            flexShrink: 0,
-            fontFamily: FONT_MONO,
-            fontSize: '8pt',
-            color: C.ink4,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-          }}
-        >
-          {pad2(entries.length)} items
         </span>
       </header>
       <ol
