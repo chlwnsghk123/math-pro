@@ -679,7 +679,7 @@ function AnswerGroup({ unitCode, unitName, entries, isLast }) {
                 overflowWrap: 'anywhere',
               }}
             >
-              <AnswerText value={ANSWERS[id]} />
+              <AnswerText value={ANSWERS[id]} multiline />
             </span>
           </li>
         ))}

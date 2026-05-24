@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { InlineMath } from 'react-katex';
 
 /**
@@ -11,32 +12,53 @@ import { InlineMath } from 'react-katex';
  *
  * Normalization: `\frac` (text style) is rewritten to `\dfrac` (display
  * style) so fractions render at a consistent, readable size across all
- * answers. Same for `\binom → \dbinom`. This keeps the answer key tidy
- * even when the source data mixes both styles.
+ * answers. Same for `\binom → \dbinom`.
+ *
+ * `multiline`: when an answer contains multiple sub-parts written as
+ * `(1) … (2) … (3) …` (separated by two-or-more spaces), each sub-part
+ * is placed on its own line. Use this in places where vertical space is
+ * available (the answer-key page); leave it off for single-line slots
+ * like the cart sidebar.
  */
-export default function AnswerText({ value, className = '' }) {
+const SUBPART_SEPARATOR = /\s{2,}(?=\(\d+\))/g;
+
+export default function AnswerText({ value, className = '', multiline = false }) {
   if (value == null || value === '') {
     return <span className={`text-slate-400 ${className}`}>—</span>;
   }
   const str = String(value);
-  const parts = str.split(/(\$[^$]+\$)/g).filter(Boolean);
+  const lines = multiline ? splitSubparts(str) : [str];
 
   return (
     <span className={className}>
-      {parts.map((part, idx) => {
-        const m = part.match(/^\$([^$]+)\$$/);
-        if (m) {
-          const tex = normalizeForDisplay(m[1]);
-          try {
-            return <InlineMath key={idx} math={tex} />;
-          } catch {
-            return <span key={idx}>{part}</span>;
-          }
-        }
-        return <span key={idx}>{part}</span>;
-      })}
+      {lines.map((line, idx) => (
+        <Fragment key={idx}>
+          {idx > 0 && <br />}
+          {renderInline(line)}
+        </Fragment>
+      ))}
     </span>
   );
+}
+
+function splitSubparts(str) {
+  return str.split(SUBPART_SEPARATOR).filter((p) => p.length > 0);
+}
+
+function renderInline(str) {
+  const parts = str.split(/(\$[^$]+\$)/g).filter(Boolean);
+  return parts.map((part, idx) => {
+    const m = part.match(/^\$([^$]+)\$$/);
+    if (m) {
+      const tex = normalizeForDisplay(m[1]);
+      try {
+        return <InlineMath key={idx} math={tex} />;
+      } catch {
+        return <span key={idx}>{part}</span>;
+      }
+    }
+    return <span key={idx}>{part}</span>;
+  });
 }
 
 function normalizeForDisplay(tex) {
