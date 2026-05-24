@@ -652,7 +652,9 @@ function AnswerGroup({ unitCode, unitName, entries, isLast }) {
               gap: '3mm',
               fontSize: '11pt',
               color: C.ink,
-              lineHeight: 1.55,
+              // Slightly taller line-height gives breathing room for
+              // text-style fractions and other inline math glyphs.
+              lineHeight: 1.7,
               minWidth: 0,
               paddingBottom: '3mm',
               borderBottom: `1px dashed ${C.hairSoft}`,

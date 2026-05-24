@@ -62,7 +62,12 @@ function renderInline(str) {
 }
 
 function normalizeForDisplay(tex) {
+  // Force text-style fractions (`\frac`) — `\dfrac` stacks numerator
+  // and denominator at full size which spills into adjacent lines on
+  // the answer key, especially when multiple fractions appear inline
+  // (e.g. "2, 9/2, 1/2"). Text-style fits in normal line-height while
+  // still being clearly legible, matching the original textbook style.
   return tex
-    .replace(/\\frac\b/g, '\\dfrac')
-    .replace(/\\binom\b/g, '\\dbinom');
+    .replace(/\\dfrac\b/g, '\\frac')
+    .replace(/\\dbinom\b/g, '\\binom');
 }
