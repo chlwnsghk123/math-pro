@@ -652,11 +652,12 @@ function AnswerGroup({ unitCode, unitName, entries, isLast }) {
               gap: '3mm',
               fontSize: '11pt',
               color: C.ink,
-              // Slightly taller line-height gives breathing room for
-              // text-style fractions and other inline math glyphs.
-              lineHeight: 1.7,
+              // Display-style fractions inline take ~2× normal line
+              // height, so set lineHeight high enough that adjacent
+              // inline math glyphs never crowd each other.
+              lineHeight: 2.1,
               minWidth: 0,
-              paddingBottom: '3mm',
+              paddingBottom: '4mm',
               borderBottom: `1px dashed ${C.hairSoft}`,
             }}
           >

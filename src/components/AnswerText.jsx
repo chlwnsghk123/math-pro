@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import { InlineMath } from 'react-katex';
 
 /**
@@ -16,9 +15,9 @@ import { InlineMath } from 'react-katex';
  *
  * `multiline`: when an answer contains multiple sub-parts written as
  * `(1) … (2) … (3) …` (separated by two-or-more spaces), each sub-part
- * is placed on its own line. Use this in places where vertical space is
- * available (the answer-key page); leave it off for single-line slots
- * like the cart sidebar.
+ * is placed in its own block so display-style fractions never spill
+ * into adjacent sub-parts. Use this in the answer-key page; leave it
+ * off for single-line slots like the cart sidebar.
  */
 const SUBPART_SEPARATOR = /\s{2,}(?=\(\d+\))/g;
 
@@ -29,13 +28,25 @@ export default function AnswerText({ value, className = '', multiline = false })
   const str = String(value);
   const lines = multiline ? splitSubparts(str) : [str];
 
+  if (lines.length <= 1) {
+    return <span className={className}>{renderInline(lines[0] ?? str)}</span>;
+  }
+
+  // Each sub-part is its own block. Block layout makes the row grow to
+  // fit any display-style math inside it (no overlap with the previous
+  // or next sub-part), and the margin gives a consistent visual gap.
   return (
     <span className={className}>
       {lines.map((line, idx) => (
-        <Fragment key={idx}>
-          {idx > 0 && <br />}
+        <span
+          key={idx}
+          style={{
+            display: 'block',
+            marginTop: idx > 0 ? '3mm' : 0,
+          }}
+        >
           {renderInline(line)}
-        </Fragment>
+        </span>
       ))}
     </span>
   );
@@ -62,12 +73,11 @@ function renderInline(str) {
 }
 
 function normalizeForDisplay(tex) {
-  // Force text-style fractions (`\frac`) — `\dfrac` stacks numerator
-  // and denominator at full size which spills into adjacent lines on
-  // the answer key, especially when multiple fractions appear inline
-  // (e.g. "2, 9/2, 1/2"). Text-style fits in normal line-height while
-  // still being clearly legible, matching the original textbook style.
+  // Display-style fractions (`\dfrac`) so fraction sizes stay uniform
+  // across the answer key. The vertical room they need is provided by
+  // block-level sub-part layout in `AnswerText` and a generous
+  // line-height on the answer-key item — see PrintPreview.
   return tex
-    .replace(/\\dfrac\b/g, '\\frac')
-    .replace(/\\dbinom\b/g, '\\binom');
+    .replace(/\\frac\b/g, '\\dfrac')
+    .replace(/\\binom\b/g, '\\dbinom');
 }
