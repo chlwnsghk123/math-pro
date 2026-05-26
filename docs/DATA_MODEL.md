@@ -93,6 +93,30 @@ matching PNG into `images/<padded-grade>/<padded-number>.png` on
 `origin/main`. The grid auto-renders any id whose key exists in
 `ANSWERS`.
 
+## 2b. Solutions manifest — `src/data/solutions.js`
+
+A separate, much smaller dataset that records which problems have a
+hand-written solution image uploaded.
+
+```js
+const SOLUTIONS = new Set([
+  // '7-15',
+  // '9-3',
+]);
+export default SOLUTIONS;
+```
+
+- The image itself lives at `solutions/<grade-padded>/<number-padded>.png`
+  on the `main` branch (same path / padding convention as `images/`).
+  Helper: `buildSolutionUrl(category, number)` in `src/config.js`.
+- The Set is the source of truth — the print preview's `Cell` calls
+  `SOLUTIONS.has(id)` to decide whether to render a `SolutionImage`
+  next to the problem.
+- Problems with NO entry here keep the existing blank solving space
+  in the cell (the user can still write by hand on the printed copy).
+- The Set ships in the bundle. There's no manifest fetch — adding an
+  id is a one-line code change.
+
 ## 3. `cartStore` — `src/store/cartStore.js`
 
 ```ts

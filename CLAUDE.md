@@ -55,13 +55,23 @@ images followed by a typeset answer key (KaTeX).
 │   ├── 09/001.png … 042.png   ← unit 09: 이차부등식과 연립이차부등식
 │   ├── 10/, 11/, 12/          ← placeholder folders (.gitkeep) — empty
 │
+├── solutions/                 ← OPTIONAL hand-written solution PNGs
+│   └── 07/ … 12/              ← same {grade-padded}/{number-padded}.png
+│                                 layout as images/.  When a file is
+│                                 present AND the matching id is listed
+│                                 in src/data/solutions.js, the print
+│                                 preview puts it next to the problem in
+│                                 its cell.
+│
 └── src/
     ├── main.jsx               ← React mount + KaTeX CSS import
     ├── App.jsx                ← top-level screen router (cart / list / preview)
     ├── config.js              ← CATEGORIES, CHAPTERS, buildImageUrl, parseProblemId
     │
     ├── data/
-    │   └── answers.js         ← THE answer-key data — 124 entries today
+    │   ├── answers.js         ← THE answer-key data — 124 entries today
+    │   └── solutions.js       ← Set of problem ids that have a
+    │                              hand-written solution image in solutions/
     │
     ├── store/
     │   ├── cartStore.js       ← selected-problem ids (in-memory, no persist)
@@ -132,6 +142,16 @@ manually opening the dev server and stepping through the flows in
    `main` branch (the app pulls it via GitHub raw URL).
 2. Add an entry to `src/data/answers.js` under the matching unit. The grid
    only renders ids that have an answers-map key — that's the registration.
+
+### Adding a hand-written solution
+
+1. Upload the solution image to
+   `solutions/<grade-padded>/<number-padded>.png` on `main` (same zero-
+   padding convention as `images/`).
+2. Add the problem id (e.g. `'9-15'`) to the Set exported from
+   `src/data/solutions.js`. The print preview's Cell uses that Set to
+   decide whether to render a `<SolutionImage>` next to the problem.
+   Problems without an entry keep the existing blank solving space.
 
 ### Print pipeline (the critical part)
 

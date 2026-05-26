@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import { buildImageUrl, CHAPTERS, parseProblemId } from '../config.js';
+import { buildImageUrl, buildSolutionUrl, CHAPTERS, parseProblemId } from '../config.js';
 import ANSWERS from '../data/answers.js';
+import SOLUTIONS from '../data/solutions.js';
 import AnswerText from './AnswerText.jsx';
 import { IconBack, IconPrint } from './Icons.jsx';
 import { useNotebookStore } from '../store/notebookStore.js';
@@ -412,6 +413,9 @@ function Cell({ id, idx }) {
   // 2×2 grid: cells 0,1 are top row; 0,2 are left column.
   const isLeftCol = idx % 2 === 0;
   const isTopRow = idx < 2;
+  const parsed = id ? parseProblemId(id) : null;
+  const hasSolution = id && SOLUTIONS.has(id);
+
   return (
     <div
       style={{
@@ -420,21 +424,22 @@ function Cell({ id, idx }) {
         overflow: 'hidden',
         background: C.paper,
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: '5mm',
         // Dashed cell outline drawn only on right/bottom of cells that
         // have a neighbour, so internal lines never double up.
         borderRight: isLeftCol ? `1px dashed ${C.hairSoft}` : 'none',
         borderBottom: isTopRow ? `1px dashed ${C.hairSoft}` : 'none',
       }}
     >
-      {id && <ProblemImage id={id} />}
+      {parsed && <ProblemImage parsed={parsed} id={id} />}
+      {parsed && hasSolution && <SolutionImage parsed={parsed} id={id} />}
     </div>
   );
 }
 
-function ProblemImage({ id }) {
-  const parsed = parseProblemId(id);
-  if (!parsed) return null;
+function ProblemImage({ parsed, id }) {
   const src = buildImageUrl(parsed.category, parsed.number);
   return (
     <img
@@ -445,12 +450,43 @@ function ProblemImage({ id }) {
       decoding="async"
       style={{
         display: 'block',
-        alignSelf: 'flex-start',
+        flexShrink: 0,
         maxWidth: '60%',
-        maxHeight: '80%',
+        maxHeight: '100%',
         width: 'auto',
         height: 'auto',
         objectFit: 'contain',
+        imageRendering: 'crisp-edges',
+      }}
+    />
+  );
+}
+
+/**
+ * Hand-written solution image, shown next to its problem when the
+ * problem id is registered in `src/data/solutions.js`. The flex parent
+ * (the Cell) makes the solution fill whatever horizontal space the
+ * problem image leaves; object-fit:contain keeps the aspect ratio so
+ * the image never gets squished.
+ */
+function SolutionImage({ parsed, id }) {
+  const src = buildSolutionUrl(parsed.category, parsed.number);
+  return (
+    <img
+      src={src}
+      alt={`${id} 풀이`}
+      crossOrigin="anonymous"
+      loading="eager"
+      decoding="async"
+      style={{
+        display: 'block',
+        flex: 1,
+        minWidth: 0,
+        maxHeight: '100%',
+        width: 'auto',
+        height: 'auto',
+        objectFit: 'contain',
+        objectPosition: 'left top',
         imageRendering: 'crisp-edges',
       }}
     />

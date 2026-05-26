@@ -98,6 +98,12 @@ The biggest single component. Accepts `notebook` prop and renders:
    - One `AnswerKeyPage` appended at the end, grouped by chapter via
      `groupAnswerEntriesByChapter`.
 
+Each `Cell` inside a `ProblemPage` is a flex row holding a
+`ProblemImage` plus — when `SOLUTIONS.has(id)` is true — a
+`SolutionImage` filling the remaining space. The `SolutionImage` pulls
+from `solutions/<grade>/<number>.png` via `buildSolutionUrl`, with
+`object-fit: contain` so any aspect ratio fits cleanly.
+
 All print-specific tokens (greyscale palette, IBM Plex Mono, Pretendard
 Variable) are inline styles here. See **PRINT_FLOW.md** for the full
 geometry / @media print interplay.

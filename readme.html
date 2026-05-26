@@ -399,6 +399,18 @@
         새 학년의 답안 키를 추가. 이미지는 GitHub의 <code>images/&lt;학년&gt;/</code>
         폴더에 업로드하면 자동으로 보입니다.</p>
     </details>
+
+    <details class="faq">
+      <summary>손글씨 풀이를 문제 옆에 같이 인쇄하고 싶어요</summary>
+      <p>두 단계입니다. (1) 손글씨 풀이 사진을
+        <code>solutions/&lt;학년&gt;/&lt;번호&gt;.png</code>로 업로드
+        (예: <code>solutions/09/015.png</code>), (2)
+        <code>src/data/solutions.js</code>의 <code>SOLUTIONS</code> Set에
+        해당 문제 ID(예: <code>'9-15'</code>)를 추가하세요. 다음에 그 문제가
+        담긴 오답노트를 인쇄하면 문제 이미지 옆에 풀이 이미지가 자동으로
+        같이 출력됩니다. 풀이를 안 올린 문제는 기존처럼 빈 손글씨 공간이
+        유지돼요.</p>
+    </details>
   </section>
 
   <footer class="bottom">

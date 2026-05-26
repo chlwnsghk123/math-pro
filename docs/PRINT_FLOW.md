@@ -165,6 +165,16 @@ height 8 mm; on a continuation page it sits empty. That way the
 quadrant grid below starts at the same y on every sheet — no jumpy
 images between pages.
 
+### Quadrant cells with optional solution
+
+Each `Cell` is a flex row. The problem image is the first flex child
+(max-width 60% of the cell, max-height 100%). If
+`SOLUTIONS.has(problemId)` is true, a second child renders the
+hand-written solution image from `solutions/<grade>/<number>.png` with
+`flex: 1` so it fills the rest of the row. When the id isn't in the
+Set, the cell has only the problem image and the remaining space stays
+empty — same as before, useful for hand-written work.
+
 ### Header line alignment fix
 
 The earlier "stair-stepped underline" look came from
