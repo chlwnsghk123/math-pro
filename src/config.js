@@ -32,17 +32,6 @@ export function buildImageUrl(category, number) {
   return `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REPO_BRANCH}/${IMAGE_BASE_PATH}/${folder}/${filename}.png`;
 }
 
-/**
- * URL for a hand-written solution image stored under
- * `solutions/<grade>/<number>.png`. Whether such a file exists is
- * decided by `src/data/solutions.js` — this helper only builds the URL.
- */
-export function buildSolutionUrl(category, number) {
-  const folder = padCategory(category);
-  const filename = String(number).padStart(3, '0');
-  return `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REPO_BRANCH}/solutions/${folder}/${filename}.png`;
-}
-
 export function parseProblemId(id) {
   if (typeof id !== 'string') return null;
   const match = id.trim().match(/^(\d{1,2})-(\d{1,3})$/);

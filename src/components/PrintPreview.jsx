@@ -1,13 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  buildImageUrl,
-  buildSolutionUrl,
-  CHAPTERS,
-  parseProblemId,
-  REPO_BRANCH,
-  REPO_NAME,
-  REPO_OWNER,
-} from '../config.js';
+import { useMemo } from 'react';
+import { buildImageUrl, CHAPTERS, parseProblemId } from '../config.js';
 import ANSWERS from '../data/answers.js';
 import AnswerText from './AnswerText.jsx';
 import { IconBack, IconPrint } from './Icons.jsx';
@@ -58,44 +50,11 @@ export default function PrintPreview({ notebook, onClose }) {
   /** Answer key: one group per chapter, in cart order. */
   const answerGroups = useMemo(() => groupAnswerEntriesByChapter(items), [items]);
 
-  /** Auto-detected solution availability per category. `null` = loading. */
-  const [solutionMap, setSolutionMap] = useState(null);
-  useEffect(() => {
-    const cats = new Set();
-    for (const id of items) {
-      const p = parseProblemId(id);
-      if (p) cats.add(p.category);
-    }
-    fetchAvailableSolutions(Array.from(cats)).then(setSolutionMap);
-  }, [items]);
+  // Page numbering: every problem page + 1 answer page (if any)
+  const totalPages = pages.length + (answerGroups.length > 0 ? 1 : 0);
 
-  /** Problems that have a solution image — in cart order. */
-  const itemsWithSolutions = useMemo(() => {
-    if (!solutionMap) return [];
-    return items.filter((id) => {
-      const p = parseProblemId(id);
-      return p && solutionMap[p.category]?.has(p.number);
-    });
-  }, [items, solutionMap]);
-
-  /** Solution pages: same chunking as problems (≤4 per page, single-chapter). */
-  const solutionPages = useMemo(
-    () => annotateSolutionPages(chunkByChapter(itemsWithSolutions, PROBLEMS_PER_PAGE)),
-    [itemsWithSolutions],
-  );
-  const hasSolutionSection = solutionPages.length > 0;
-
-  // Page numbering: problem pages
-  //                 + 1 풀이 divider page (if any solutions)
-  //                 + solution pages
-  //                 + 1 answer page (if any)
-  const totalPages =
-    pages.length +
-    (hasSolutionSection ? 1 + solutionPages.length : 0) +
-    (answerGroups.length > 0 ? 1 : 0);
-
-  async function handleDownload() {
-    await handleBrowserPrint({ title, studentName, studentDate });
+  function handleDownload() {
+    handleBrowserPrint({ title, studentName, studentDate });
   }
 
   return (
@@ -171,7 +130,7 @@ export default function PrintPreview({ notebook, onClose }) {
             <>
               {pages.map((page, pageIdx) => (
                 <ProblemPage
-                  key={`p-${pageIdx}`}
+                  key={pageIdx}
                   title={title}
                   studentName={studentName}
                   studentDate={studentDate}
@@ -184,23 +143,6 @@ export default function PrintPreview({ notebook, onClose }) {
                   totalPages={totalPages}
                 />
               ))}
-              {hasSolutionSection && (
-                <SolutionDividerPage
-                  pageNumber={pages.length + 1}
-                  totalPages={totalPages}
-                />
-              )}
-              {hasSolutionSection &&
-                solutionPages.map((sp, idx) => (
-                  <SolutionPage
-                    key={`s-${idx}`}
-                    items={sp.items}
-                    unitCode={sp.unitCode}
-                    unitName={sp.unitName}
-                    pageNumber={pages.length + 2 + idx}
-                    totalPages={totalPages}
-                  />
-                ))}
               {answerGroups.length > 0 && (
                 <AnswerKeyPage
                   groups={answerGroups}
@@ -515,239 +457,6 @@ function ProblemImage({ id }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────
- * Solutions section — separate pages after the problem pages.
- * Each cell pairs a problem image with its hand-written solution
- * image (side by side). Only problems that actually have a solution
- * file uploaded under `solutions/<grade>/<number>.png` appear here.
- * ───────────────────────────────────────────────────────────────────── */
-
-function SolutionPage({ items, unitCode, unitName, pageNumber, totalPages }) {
-  return (
-    <article data-pdf-page style={pageStyle}>
-      <SolutionPageHeader unitCode={unitCode} unitName={unitName} />
-      <SolutionGrid items={items} />
-      <PageFooter
-        unitCode={unitCode || ''}
-        unitName="풀이"
-        pageNumber={pageNumber}
-        totalPages={totalPages}
-      />
-    </article>
-  );
-}
-
-function SolutionPageHeader({ unitCode, unitName }) {
-  return (
-    <header style={{ marginBottom: '4mm', flexShrink: 0 }}>
-      {/* Reserved title row, blank — solution pages never carry the
-          top-of-document title slot, only the unit row.  Keeping the
-          slot reserved means the grid below sits at the same y as on
-          problem pages. */}
-      <div style={{ height: '14mm' }} />
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '5mm',
-          height: '8mm',
-        }}
-      >
-        <span
-          style={{
-            fontFamily: FONT_MONO,
-            fontSize: '8pt',
-            letterSpacing: '0.28em',
-            textTransform: 'uppercase',
-            color: C.ink4,
-          }}
-        >
-          풀이
-        </span>
-        {unitCode && (
-          <>
-            <span
-              style={{
-                fontFamily: FONT_MONO,
-                fontSize: '11pt',
-                fontWeight: 500,
-                color: C.ink,
-                letterSpacing: '-0.01em',
-              }}
-            >
-              {unitCode}
-            </span>
-            <span
-              style={{
-                display: 'inline-block',
-                width: '3mm',
-                height: '1px',
-                background: C.ink4,
-                transform: 'translateY(-2px)',
-              }}
-            />
-            <span
-              style={{
-                fontSize: '12pt',
-                fontWeight: 700,
-                color: C.ink,
-                letterSpacing: '-0.015em',
-              }}
-            >
-              {unitName}
-            </span>
-          </>
-        )}
-      </div>
-    </header>
-  );
-}
-
-function SolutionGrid({ items }) {
-  const slots = [0, 1, 2, 3].map((i) => items[i] || null);
-  return (
-    <div
-      style={{
-        flex: 1,
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gridTemplateRows: '1fr 1fr',
-        borderTop: `1px solid ${C.ink}`,
-        borderBottom: `1px solid ${C.hair}`,
-        position: 'relative',
-      }}
-    >
-      {slots.map((id, idx) => (
-        <SolutionCell key={idx} id={id} idx={idx} />
-      ))}
-    </div>
-  );
-}
-
-function SolutionCell({ id, idx }) {
-  const isLeftCol = idx % 2 === 0;
-  const isTopRow = idx < 2;
-  if (!id) {
-    return (
-      <div
-        style={{
-          borderRight: isLeftCol ? `1px dashed ${C.hairSoft}` : 'none',
-          borderBottom: isTopRow ? `1px dashed ${C.hairSoft}` : 'none',
-        }}
-      />
-    );
-  }
-  const parsed = parseProblemId(id);
-  if (!parsed) return <div />;
-  const problemSrc = buildImageUrl(parsed.category, parsed.number);
-  const solutionSrc = buildSolutionUrl(parsed.category, parsed.number);
-  return (
-    <div
-      style={{
-        position: 'relative',
-        padding: '7mm 8mm 8mm 7mm',
-        overflow: 'hidden',
-        background: C.paper,
-        display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: '5mm',
-        borderRight: isLeftCol ? `1px dashed ${C.hairSoft}` : 'none',
-        borderBottom: isTopRow ? `1px dashed ${C.hairSoft}` : 'none',
-      }}
-    >
-      <img
-        src={problemSrc}
-        alt={id}
-        crossOrigin="anonymous"
-        loading="eager"
-        decoding="async"
-        style={{
-          display: 'block',
-          flexShrink: 0,
-          maxWidth: '38%',
-          maxHeight: '100%',
-          width: 'auto',
-          height: 'auto',
-          objectFit: 'contain',
-          imageRendering: 'crisp-edges',
-        }}
-      />
-      <img
-        src={solutionSrc}
-        alt={`${id} 풀이`}
-        crossOrigin="anonymous"
-        loading="eager"
-        decoding="async"
-        style={{
-          display: 'block',
-          flex: 1,
-          minWidth: 0,
-          maxHeight: '100%',
-          width: 'auto',
-          height: 'auto',
-          objectFit: 'contain',
-          objectPosition: 'left top',
-          imageRendering: 'crisp-edges',
-        }}
-      />
-    </div>
-  );
-}
-
-function SolutionDividerPage({ pageNumber, totalPages }) {
-  return (
-    <article data-pdf-page style={pageStyle}>
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '6mm',
-        }}
-      >
-        <div
-          style={{
-            fontFamily: FONT_MONO,
-            fontSize: '10pt',
-            letterSpacing: '0.36em',
-            textTransform: 'uppercase',
-            color: C.ink4,
-          }}
-        >
-          Solutions
-        </div>
-        <div
-          style={{
-            fontSize: '64pt',
-            fontWeight: 800,
-            letterSpacing: '-0.05em',
-            color: C.ink,
-            lineHeight: 1,
-          }}
-        >
-          풀이
-        </div>
-        <div
-          style={{
-            width: '40mm',
-            height: '1.5px',
-            background: C.ink,
-          }}
-        />
-      </div>
-      <PageFooter
-        unitCode={null}
-        unitName="풀이"
-        pageNumber={pageNumber}
-        totalPages={totalPages}
-      />
-    </article>
-  );
-}
-
 function PageFooter({ unitCode, unitName, pageNumber, totalPages }) {
   const left = unitCode
     ? `오답 노트 · Unit ${unitCode}`
@@ -998,24 +707,6 @@ function annotatePages(pages) {
 }
 
 /**
- * For solution pages, every page shows the unit header (since the
- * solutions section is a self-contained block — the reader benefits
- * from seeing the unit at a glance on any sheet, not just the first).
- */
-function annotateSolutionPages(pages) {
-  return pages.map((items) => {
-    const parsed = parseProblemId(items[0]);
-    const cat = parsed?.category;
-    const chapter = CHAPTERS[cat];
-    return {
-      items,
-      unitCode: chapter ? extractUnitCode(chapter) : null,
-      unitName: chapter ? extractUnitName(chapter) : '',
-    };
-  });
-}
-
-/**
  * Group answer-key entries by chapter, in cart order. Each entry's
  * `displayNumber` is the actual problem number from the ID
  * (e.g. `9-15` → 15), so the answer key matches the textbook's
@@ -1069,16 +760,8 @@ function extractUnitName(chapter) {
  * We tweak `document.title` so the browser's "Save as PDF" dialog
  * pre-fills the filename as "제목-이름-날짜".
  * ───────────────────────────────────────────────────────────────────── */
-async function handleBrowserPrint({ title, studentName, studentDate }) {
+function handleBrowserPrint({ title, studentName, studentDate }) {
   const desiredName = buildFilename({ title, studentName, studentDate });
-
-  // Wait for fonts + every preview image to be on screen before opening
-  // the print dialog. Mobile browsers (Safari iOS, Chrome Android) often
-  // snapshot the DOM the moment `window.print()` returns; if a font or
-  // image hasn't loaded yet, that sheet prints with a fallback font or
-  // a broken-image placeholder.
-  await waitForFontsAndImages();
-
   const prevTitle = document.title;
   document.title = desiredName;
   document.body.classList.add('is-printing');
@@ -1097,38 +780,7 @@ async function handleBrowserPrint({ title, studentName, studentDate }) {
   // few seconds so the modified title/body class never leaks.
   setTimeout(restore, 6000);
 
-  // Allow one tick for `body.is-printing` styles to apply before the
-  // browser snapshots the DOM for its print dialog.
-  await new Promise((resolve) => setTimeout(resolve, 30));
-
   window.print();
-}
-
-async function waitForFontsAndImages() {
-  const fontsReady =
-    typeof document !== 'undefined' && document.fonts?.ready
-      ? document.fonts.ready
-      : Promise.resolve();
-
-  const imgs = Array.from(document.querySelectorAll('[data-pdf-page] img'));
-  const imageReady = Promise.all(
-    imgs.map(
-      (img) =>
-        new Promise((resolve) => {
-          if (img.complete && img.naturalWidth > 0) {
-            resolve();
-            return;
-          }
-          img.addEventListener('load', () => resolve(), { once: true });
-          img.addEventListener('error', () => resolve(), { once: true });
-          // Hard timeout — never block print for more than 5s on a
-          // single slow image (e.g. a 404 on a hand-written solution).
-          setTimeout(resolve, 5000);
-        }),
-    ),
-  );
-
-  await Promise.all([fontsReady, imageReady]);
 }
 
 /** "제목-이름-날짜" with each segment file-system-safe. Empty name leaves
@@ -1139,52 +791,4 @@ function buildFilename({ title, studentName, studentDate }) {
       .replace(/[\\/:*?"<>|]/g, '_')
       .trim();
   return `${safe(title) || '오답 노트'}-${safe(studentName)}-${safe(studentDate)}`;
-}
-
-/* ─────────────────────────────────────────────────────────────────────
- * Solution availability — GitHub Contents API
- *
- * Replaces the old `src/data/solutions.js` manifest. For each grade
- * present in the notebook, hit
- *   GET /repos/{owner}/{repo}/contents/solutions/{grade}?ref={branch}
- * once, parse `NNN.png` file names into a Set of numbers. Results are
- * cached in memory for the session.
- *
- * Rate limit note: unauthenticated GitHub API gives 60 requests / hour
- * per IP. With one request per grade per notebook open, a typical user
- * stays well under that.
- * ───────────────────────────────────────────────────────────────────── */
-const _solutionCache = new Map(); // category → Promise<Set<number>>
-
-function fetchAvailableSolutions(categories) {
-  const result = {};
-  return Promise.all(
-    categories.map(async (cat) => {
-      if (!_solutionCache.has(cat)) {
-        _solutionCache.set(cat, loadSolutionsForCategory(cat));
-      }
-      result[cat] = await _solutionCache.get(cat);
-    }),
-  ).then(() => result);
-}
-
-async function loadSolutionsForCategory(cat) {
-  const folder = String(cat).padStart(2, '0');
-  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/solutions/${folder}?ref=${REPO_BRANCH}`;
-  const numbers = new Set();
-  try {
-    const res = await fetch(url, {
-      headers: { Accept: 'application/vnd.github+json' },
-    });
-    if (!res.ok) return numbers;
-    const files = await res.json();
-    if (!Array.isArray(files)) return numbers;
-    for (const f of files) {
-      const m = typeof f?.name === 'string' && f.name.match(/^(\d{3})\.png$/i);
-      if (m) numbers.add(Number(m[1]));
-    }
-  } catch {
-    // Network / CORS / quota — silently treat as "no solutions known".
-  }
-  return numbers;
 }

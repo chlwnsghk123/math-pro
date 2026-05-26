@@ -1,9 +1,0 @@
-# solutions/08/
-
-손글씨 풀이 이미지를 업로드하는 폴더 — 8학년.
-파일명은 문제 번호 세 자리 + .png (예: 015.png, 030.png, 042.png).
-
-업로드 후 src/data/solutions.js 에 '8-<번호>' 키를 추가하면
-오답노트 인쇄 시 문제 셀 옆에 풀이 이미지가 자동으로 표시됩니다.
-
-예상 URL: https://raw.githubusercontent.com/chlwnsghk123/math-pro/main/solutions/08/015.png

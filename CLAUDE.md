@@ -55,18 +55,6 @@ images followed by a typeset answer key (KaTeX).
 │   ├── 09/001.png … 042.png   ← unit 09: 이차부등식과 연립이차부등식
 │   ├── 10/, 11/, 12/          ← placeholder folders (.gitkeep) — empty
 │
-├── solutions/                 ← OPTIONAL hand-written solution PNGs
-│   └── 07/ … 12/              ← same {grade-padded}/{number-padded}.png
-│                                 layout as images/.  Availability is
-│                                 auto-detected at runtime via the
-│                                 GitHub Contents API (no JS manifest
-│                                 needed). When a solution exists for a
-│                                 problem in the notebook, the print
-│                                 output gets an extra "풀이" section
-│                                 between the problem pages and the
-│                                 answer key, pairing each problem with
-│                                 its solution.
-│
 └── src/
     ├── main.jsx               ← React mount + KaTeX CSS import
     ├── App.jsx                ← top-level screen router (cart / list / preview)
@@ -144,27 +132,6 @@ manually opening the dev server and stepping through the flows in
    `main` branch (the app pulls it via GitHub raw URL).
 2. Add an entry to `src/data/answers.js` under the matching unit. The grid
    only renders ids that have an answers-map key — that's the registration.
-
-### Adding a hand-written solution
-
-Upload only — **no code change**. Drop the image at
-`solutions/<grade-padded>/<number-padded>.png` on `main` (same zero-
-padding convention as `images/`). The print preview hits the GitHub
-Contents API on open to enumerate which solutions exist for each grade
-in the notebook, so a freshly-uploaded file shows up on the next preview
-open without any redeploy.
-
-Behaviour:
-- Problems WITH a solution image → rendered twice: once on the regular
-  problem pages (with the usual blank solving area), and once in the
-  "풀이" section between problems and answer key, paired with the
-  solution image.
-- Problems WITHOUT a solution → appear only on the problem pages; the
-  solution section silently skips them.
-
-API rate-limit caveat: unauthenticated GitHub Contents API is 60
-req/hour per IP. We cache the result per grade in-memory for the
-session.
 
 ### Print pipeline (the critical part)
 

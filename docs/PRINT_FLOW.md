@@ -165,32 +165,6 @@ height 8 mm; on a continuation page it sits empty. That way the
 quadrant grid below starts at the same y on every sheet — no jumpy
 images between pages.
 
-### Dedicated solutions section
-
-When the notebook contains any problem for which a solution image is
-available on the server, the page sequence grows from
-
-```
-[Problem pages …][Answer key]
-```
-
-to
-
-```
-[Problem pages …][풀이 divider][Solution pages …][Answer key]
-```
-
-`PrintPreview` learns which solutions exist by calling
-`fetchAvailableSolutions(categories)` (see `loadSolutionsForCategory`).
-The result is a `{ category → Set<number> }` map; `itemsWithSolutions`
-filters the notebook by that. The filtered list is then chunked the
-same way problem pages are (`chunkByChapter`, ≤4 per page, never mixing
-chapters), and rendered by `<SolutionPage>` — each cell is a flex row
-holding the problem image (`max-width: 38%`) plus the solution image
-(`flex: 1`, `object-fit: contain`, top-left anchored). The problem
-itself still appears on the regular problem pages too; the solution
-section is purely a supplement.
-
 ### Header line alignment fix
 
 The earlier "stair-stepped underline" look came from
