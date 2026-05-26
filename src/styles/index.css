@@ -59,14 +59,25 @@
     margin: 0;
   }
 
+  /* Force colour-exact rendering on EVERY element. iOS Safari + some
+     Android browsers ignore the top-level rule unless it's restated
+     per-element. */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
   html,
   body {
     background: #ffffff !important;
     margin: 0 !important;
     padding: 0 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    color-adjust: exact;
+    /* iOS Safari sometimes scales fonts up in print — pin to 100%. */
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
   }
 
   .no-print {
@@ -74,8 +85,8 @@
   }
 
   /* When `handleBrowserPrint` is called it toggles `body.is-printing`,
-     and the @media print block below scopes everything to that class so
-     the rules never affect normal screen layout. */
+     and the rules below scope everything to that class so they never
+     touch normal screen layout. */
   body.is-printing .app-root > *:not(.print-preview-root) {
     display: none !important;
   }
@@ -85,23 +96,34 @@
   }
 
   /* Drop the overlay's fixed positioning so the browser can paginate
-     normally instead of repeating the first page. */
+     normally instead of repeating the first page on every sheet
+     (a common mobile Safari failure mode). */
   body.is-printing .print-preview-root {
     position: static !important;
     inset: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+    height: auto !important;
     background: #ffffff !important;
     display: block !important;
+    overflow: visible !important;
   }
 
   body.is-printing .print-scroll {
     padding: 0 !important;
     overflow: visible !important;
+    height: auto !important;
     background: #ffffff !important;
   }
   body.is-printing .print-pages {
     gap: 0 !important;
     padding: 0 !important;
+    width: auto !important;
     background: #ffffff !important;
+    display: block !important;
   }
 
   /* Each preview page = one printer sheet.  Hairlines and KaTeX render
@@ -114,10 +136,22 @@
     box-shadow: none !important;
     page-break-after: always;
     break-after: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
     overflow: hidden !important;
+    /* iOS Safari sometimes adds a tiny transform during print; force
+       the page back to its natural coordinates. */
+    transform: none !important;
   }
   body.is-printing [data-pdf-page]:last-of-type {
     page-break-after: auto;
     break-after: auto;
+  }
+
+  /* Images inside print pages — make sure mobile browsers honour the
+     intrinsic sizing rather than scaling to viewport width. */
+  body.is-printing [data-pdf-page] img {
+    max-width: 100% !important;
+    image-rendering: -webkit-optimize-contrast;
   }
 }

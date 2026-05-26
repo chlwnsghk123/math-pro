@@ -89,20 +89,25 @@ summary subtitle, and Open / Delete buttons. Empty state shows
 The biggest single component. Accepts `notebook` prop and renders:
 
 1. A toolbar (`.print-chrome`) with title / name / date inputs that
-   write back through `useNotebookStore.update`. The "PDF 저장" button
+   write back through `useNotebookStore.update`. The "인쇄 / PDF" button
    calls `handleBrowserPrint(...)`.
 2. A scroll container (`.print-scroll` > `.print-pages`) of A4-landscape
-   page articles (`[data-pdf-page]`):
-   - One `ProblemPage` per chunk of up to 4 problems from one chapter
-     (see `chunkByChapter` + `annotatePages`).
-   - One `AnswerKeyPage` appended at the end, grouped by chapter via
+   page articles (`[data-pdf-page]`), in order:
+   - `ProblemPage` × N — chunked by chapter (`chunkByChapter` +
+     `annotatePages`), ≤4 problems per page, each cell shows just the
+     problem image with the blank solving area to its right.
+   - `SolutionDividerPage` — one centered "풀이" title page, only
+     present when at least one item in the notebook has a solution
+     image available on the server.
+   - `SolutionPage` × M — chunked the same way as problem pages but
+     drawing from `itemsWithSolutions`. Each `SolutionCell` is a flex
+     row pairing the problem image (`max-width: 38%`) with the
+     solution image (`flex: 1`).
+   - `AnswerKeyPage` — final page, grouped by chapter via
      `groupAnswerEntriesByChapter`.
 
-Each `Cell` inside a `ProblemPage` is a flex row holding a
-`ProblemImage` plus — when `SOLUTIONS.has(id)` is true — a
-`SolutionImage` filling the remaining space. The `SolutionImage` pulls
-from `solutions/<grade>/<number>.png` via `buildSolutionUrl`, with
-`object-fit: contain` so any aspect ratio fits cleanly.
+Solution availability is auto-detected via the GitHub Contents API
+(see `loadSolutionsForCategory`); no manifest file is involved.
 
 All print-specific tokens (greyscale palette, IBM Plex Mono, Pretendard
 Variable) are inline styles here. See **PRINT_FLOW.md** for the full

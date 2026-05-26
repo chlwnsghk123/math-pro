@@ -57,11 +57,15 @@ images followed by a typeset answer key (KaTeX).
 │
 ├── solutions/                 ← OPTIONAL hand-written solution PNGs
 │   └── 07/ … 12/              ← same {grade-padded}/{number-padded}.png
-│                                 layout as images/.  When a file is
-│                                 present AND the matching id is listed
-│                                 in src/data/solutions.js, the print
-│                                 preview puts it next to the problem in
-│                                 its cell.
+│                                 layout as images/.  Availability is
+│                                 auto-detected at runtime via the
+│                                 GitHub Contents API (no JS manifest
+│                                 needed). When a solution exists for a
+│                                 problem in the notebook, the print
+│                                 output gets an extra "풀이" section
+│                                 between the problem pages and the
+│                                 answer key, pairing each problem with
+│                                 its solution.
 │
 └── src/
     ├── main.jsx               ← React mount + KaTeX CSS import
@@ -69,9 +73,7 @@ images followed by a typeset answer key (KaTeX).
     ├── config.js              ← CATEGORIES, CHAPTERS, buildImageUrl, parseProblemId
     │
     ├── data/
-    │   ├── answers.js         ← THE answer-key data — 124 entries today
-    │   └── solutions.js       ← Set of problem ids that have a
-    │                              hand-written solution image in solutions/
+    │   └── answers.js         ← THE answer-key data — 124 entries today
     │
     ├── store/
     │   ├── cartStore.js       ← selected-problem ids (in-memory, no persist)
@@ -145,13 +147,24 @@ manually opening the dev server and stepping through the flows in
 
 ### Adding a hand-written solution
 
-1. Upload the solution image to
-   `solutions/<grade-padded>/<number-padded>.png` on `main` (same zero-
-   padding convention as `images/`).
-2. Add the problem id (e.g. `'9-15'`) to the Set exported from
-   `src/data/solutions.js`. The print preview's Cell uses that Set to
-   decide whether to render a `<SolutionImage>` next to the problem.
-   Problems without an entry keep the existing blank solving space.
+Upload only — **no code change**. Drop the image at
+`solutions/<grade-padded>/<number-padded>.png` on `main` (same zero-
+padding convention as `images/`). The print preview hits the GitHub
+Contents API on open to enumerate which solutions exist for each grade
+in the notebook, so a freshly-uploaded file shows up on the next preview
+open without any redeploy.
+
+Behaviour:
+- Problems WITH a solution image → rendered twice: once on the regular
+  problem pages (with the usual blank solving area), and once in the
+  "풀이" section between problems and answer key, paired with the
+  solution image.
+- Problems WITHOUT a solution → appear only on the problem pages; the
+  solution section silently skips them.
+
+API rate-limit caveat: unauthenticated GitHub Contents API is 60
+req/hour per IP. We cache the result per grade in-memory for the
+session.
 
 ### Print pipeline (the critical part)
 

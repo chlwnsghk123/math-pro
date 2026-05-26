@@ -165,15 +165,31 @@ height 8 mm; on a continuation page it sits empty. That way the
 quadrant grid below starts at the same y on every sheet — no jumpy
 images between pages.
 
-### Quadrant cells with optional solution
+### Dedicated solutions section
 
-Each `Cell` is a flex row. The problem image is the first flex child
-(max-width 60% of the cell, max-height 100%). If
-`SOLUTIONS.has(problemId)` is true, a second child renders the
-hand-written solution image from `solutions/<grade>/<number>.png` with
-`flex: 1` so it fills the rest of the row. When the id isn't in the
-Set, the cell has only the problem image and the remaining space stays
-empty — same as before, useful for hand-written work.
+When the notebook contains any problem for which a solution image is
+available on the server, the page sequence grows from
+
+```
+[Problem pages …][Answer key]
+```
+
+to
+
+```
+[Problem pages …][풀이 divider][Solution pages …][Answer key]
+```
+
+`PrintPreview` learns which solutions exist by calling
+`fetchAvailableSolutions(categories)` (see `loadSolutionsForCategory`).
+The result is a `{ category → Set<number> }` map; `itemsWithSolutions`
+filters the notebook by that. The filtered list is then chunked the
+same way problem pages are (`chunkByChapter`, ≤4 per page, never mixing
+chapters), and rendered by `<SolutionPage>` — each cell is a flex row
+holding the problem image (`max-width: 38%`) plus the solution image
+(`flex: 1`, `object-fit: contain`, top-left anchored). The problem
+itself still appears on the regular problem pages too; the solution
+section is purely a supplement.
 
 ### Header line alignment fix
 

@@ -93,29 +93,42 @@ matching PNG into `images/<padded-grade>/<padded-number>.png` on
 `origin/main`. The grid auto-renders any id whose key exists in
 `ANSWERS`.
 
-## 2b. Solutions manifest — `src/data/solutions.js`
+## 2b. Solution availability — runtime GitHub API lookup
 
-A separate, much smaller dataset that records which problems have a
-hand-written solution image uploaded.
+There is **no manifest file**. Whether a problem has a hand-written
+solution is decided at runtime by asking the GitHub Contents API which
+files exist under `solutions/<grade-padded>/`.
 
-```js
-const SOLUTIONS = new Set([
-  // '7-15',
-  // '9-3',
-]);
-export default SOLUTIONS;
+```
+GET https://api.github.com/repos/{owner}/{repo}/contents/solutions/{grade}?ref={branch}
+
+→ [
+    { "name": "015.png", "type": "file", ... },
+    { "name": "030.png", "type": "file", ... },
+  ]
 ```
 
-- The image itself lives at `solutions/<grade-padded>/<number-padded>.png`
-  on the `main` branch (same path / padding convention as `images/`).
-  Helper: `buildSolutionUrl(category, number)` in `src/config.js`.
-- The Set is the source of truth — the print preview's `Cell` calls
-  `SOLUTIONS.has(id)` to decide whether to render a `SolutionImage`
-  next to the problem.
-- Problems with NO entry here keep the existing blank solving space
-  in the cell (the user can still write by hand on the printed copy).
-- The Set ships in the bundle. There's no manifest fetch — adding an
-  id is a one-line code change.
+The PrintPreview's `loadSolutionsForCategory(cat)` helper:
+1. Pads the category to 2 digits (`9` → `09`).
+2. Calls the API once per category that's in the open notebook.
+3. Extracts file names matching `^(\d{3})\.png$` and builds a
+   `Set<number>` of available problem numbers for that grade.
+4. Caches the Promise in a module-level `Map` so repeated opens during
+   the same session don't re-hit the API.
+
+Image URL is built with `buildSolutionUrl(category, number)` in
+`src/config.js` — same shape as `buildImageUrl` but with the
+`solutions/` path.
+
+Behaviour:
+- Problems with a solution → appear on the regular problem pages AND in
+  the dedicated "풀이" section (problem image + solution image side by
+  side per cell).
+- Problems without a solution → appear only on the problem pages.
+
+Caveat: the Contents API is rate-limited to 60 unauthenticated requests
+per hour per IP. With per-grade caching, a typical user stays well
+under that.
 
 ## 3. `cartStore` — `src/store/cartStore.js`
 
