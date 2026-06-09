@@ -107,9 +107,11 @@ answerOf(v)    // object → v.a ; string → extractFinalAnswer(v)  (답만 mod
 solutionOf(v)  // object → v.s ; string → v                      (풀이 mode)
 ```
 
-Notebooks carry `solutionMode: 'answer' | 'solution'` (default `'solution'`,
-toggled in the PrintPreview toolbar) which picks `answerOf` vs `solutionOf`
-per entry when building the answer sheets.
+Notebooks carry `solutionMode: 'none' | 'answer' | 'solution'` (default
+`'solution'`) and `handwriting: boolean`, both set from the **세부 설정** menu in
+the PrintPreview toolbar. `'none'` prints no answer sheet at all; `'answer'`
+uses `answerOf`, `'solution'` uses `solutionOf` per entry. `handwriting` renders
+those answer sheets in a handwriting font (see PRINT_FLOW §10).
 
 ### Rules `AnswerText` enforces
 
@@ -166,7 +168,8 @@ type Notebook = {
   studentName: string;       // may be ""
   studentDate: string;       // "YYYY-MM-DD" (HTML date input format)
   problemIds:  string[];     // sorted by compareProblemIds, immutable
-  solutionMode: 'answer' | 'solution';  // answer-key style (default 'solution')
+  solutionMode: 'none' | 'answer' | 'solution';  // answer-sheet style (default 'solution')
+  handwriting: boolean;      // render the answer sheet in a handwriting font
   createdAt:   number;       // Date.now() at creation
   updatedAt:   number;
 };
