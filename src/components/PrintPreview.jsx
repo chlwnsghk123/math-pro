@@ -63,8 +63,15 @@ export default function PrintPreview({ notebook, onClose }) {
     [answerGroups, answerMode],
   );
 
-  // Page numbering: every problem page + every answer/solution page.
-  const totalPages = pages.length + answerPages.length;
+  // The answer section must begin on an ODD page so that, when printed
+  // double-sided, it lands on the front face of a fresh sheet. If the
+  // problem pages end on an odd page (so the answer would start on an even
+  // page), slip one intentionally-blank page in between.
+  const needBlank = answerPages.length > 0 && pages.length % 2 === 1;
+  const answerStart = pages.length + (needBlank ? 1 : 0);
+
+  // Page numbering: problem pages + (optional blank) + answer/solution pages.
+  const totalPages = answerStart + answerPages.length;
 
   function handleDownload() {
     handleBrowserPrint({ title, studentName, studentDate });
@@ -156,13 +163,14 @@ export default function PrintPreview({ notebook, onClose }) {
                   totalPages={totalPages}
                 />
               ))}
+              {needBlank && <BlankPage />}
               {answerPages.map((blocks, idx) => (
                 <AnswerKeyPage
                   key={`ans-${idx}`}
                   blocks={blocks}
                   mode={answerMode}
                   isFirst={idx === 0}
-                  pageNumber={pages.length + idx + 1}
+                  pageNumber={answerStart + idx + 1}
                   totalPages={totalPages}
                 />
               ))}
@@ -195,6 +203,37 @@ const pageStyle = {
   boxShadow:
     '0 1px 0 rgba(0,0,0,.04), 0 12px 32px -12px rgba(0,0,0,.18), 0 2px 6px -2px rgba(0,0,0,.06)',
 };
+
+/**
+ * Intentionally-blank filler sheet so the answer section starts on an odd
+ * page (front face) when printed double-sided. Carries the same
+ * `[data-pdf-page]` tag so it occupies exactly one A4 sheet, and a faint
+ * centred note that only reads as a watermark on screen / paper.
+ */
+function BlankPage() {
+  return (
+    <article
+      data-pdf-page
+      style={{
+        ...pageStyle,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <span
+        style={{
+          fontFamily: FONT_MONO,
+          fontSize: '8pt',
+          letterSpacing: '0.28em',
+          textTransform: 'uppercase',
+          color: C.ink4,
+        }}
+      >
+        이 페이지는 비워 둠
+      </span>
+    </article>
+  );
+}
 
 function ProblemPage({
   title,
@@ -473,12 +512,9 @@ function ProblemImage({ id }) {
   );
 }
 
-function PageFooter({ unitCode, unitName, pageNumber, totalPages }) {
-  const left = unitCode
-    ? `오답 노트 · Unit ${unitCode}`
-    : unitName
-      ? `오답 노트 · ${unitName}`
-      : '오답 노트';
+function PageFooter({ unitName, pageNumber, totalPages }) {
+  // Bottom-left shows the unit name only (no "오답 노트" prefix).
+  const left = unitName || '';
   return (
     <div
       style={{
