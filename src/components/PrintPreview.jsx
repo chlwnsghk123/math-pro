@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { buildImageUrl, getCategory, parseProblemId } from '../data/catalog.js';
 import ANSWERS from '../data/answers.js';
 import AnswerText, { answerOf, solutionOf } from './AnswerText.jsx';
@@ -48,6 +48,29 @@ export default function PrintPreview({ notebook, onClose }) {
   const setStudentDate = (v) => updateNotebook(notebook.id, { studentDate: v });
   const setAnswerMode = (v) => updateNotebook(notebook.id, { solutionMode: v });
 
+  // Keep `body.is-printing` set for the WHOLE time the preview is open, not
+  // just during window.print(). The @media print rules are scoped to that
+  // class, so this has zero effect on the screen — but it means EVERY print
+  // path (our button, Ctrl/Cmd+P, the mobile browser's own print/share menu)
+  // produces the clean A4-landscape output instead of the raw app chrome.
+  // On mobile the old toggle-at-click approach failed: the browser menu skips
+  // our button, and the 6 s auto-restore fired before the OS finished
+  // rendering — both leaked the app menus onto the page.
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.body.classList.add('is-printing');
+    return () => {
+      document.body.classList.remove('is-printing');
+      document.title = prevTitle;
+    };
+  }, []);
+
+  // The browser uses document.title as the default "Save as PDF" filename.
+  // Keep it in sync with the cover fields so any print path names the file.
+  useEffect(() => {
+    document.title = buildFilename({ title, studentName, studentDate });
+  }, [title, studentName, studentDate]);
+
   /** Problem pages: chunk by chapter, then split into pages of 4. */
   const pages = useMemo(() => annotatePages(chunkByChapter(items, PROBLEMS_PER_PAGE)), [items]);
 
@@ -77,7 +100,9 @@ export default function PrintPreview({ notebook, onClose }) {
   const totalPages = answerStart + answerPages.length;
 
   function handleDownload() {
-    handleBrowserPrint({ title, studentName, studentDate });
+    // `body.is-printing` + document.title are already managed by the effects
+    // above, so just open the browser's print dialog.
+    window.print();
   }
 
   return (
@@ -124,6 +149,14 @@ export default function PrintPreview({ notebook, onClose }) {
             value={studentDate}
             onChange={setStudentDate}
           />
+        </div>
+        {/* Mobile browsers (esp. iOS) can't be forced into landscape from CSS,
+            so nudge the user to pick it in the print sheet. */}
+        <div className="px-4 pb-2.5 sm:hidden">
+          <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-medium leading-snug text-amber-700 ring-1 ring-amber-100">
+            📄 인쇄 화면에서 용지 방향을 <b>가로</b>로 선택하세요. (모바일은 자동
+            가로 설정이 안 될 수 있어요)
+          </p>
         </div>
       </header>
 
@@ -929,29 +962,6 @@ function matrixRows(line) {
  * We tweak `document.title` so the browser's "Save as PDF" dialog
  * pre-fills the filename as "제목-이름-날짜".
  * ───────────────────────────────────────────────────────────────────── */
-function handleBrowserPrint({ title, studentName, studentDate }) {
-  const desiredName = buildFilename({ title, studentName, studentDate });
-  const prevTitle = document.title;
-  document.title = desiredName;
-  document.body.classList.add('is-printing');
-
-  let restored = false;
-  const restore = () => {
-    if (restored) return;
-    restored = true;
-    document.title = prevTitle;
-    document.body.classList.remove('is-printing');
-    window.removeEventListener('afterprint', restore);
-  };
-  window.addEventListener('afterprint', restore);
-
-  // Some browsers don't reliably fire `afterprint`. Hard-restore after a
-  // few seconds so the modified title/body class never leaks.
-  setTimeout(restore, 6000);
-
-  window.print();
-}
-
 /** "제목-이름-날짜" with each segment file-system-safe. Empty name leaves
  *  an empty middle segment, per spec. */
 function buildFilename({ title, studentName, studentDate }) {

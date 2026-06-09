@@ -30,7 +30,9 @@ before the dialog opens.
 
 ```
 src/components/PrintPreview.jsx
-    ├── handleBrowserPrint()      ← entry point from the "PDF 저장" button
+    ├── useEffect (mount)         ← adds body.is-printing for the preview's
+    │                                whole lifetime; restores title on unmount
+    ├── handleDownload()          ← the "인쇄 / PDF" button → window.print()
     ├── buildFilename()           ← "{title}-{name}-{date}", sanitised
     ├── ProblemPage               ← one A4 sheet of up to 4 problems
     │     ├── PageHeader          ← title + Name/Date (page 1) + unit row
@@ -50,31 +52,40 @@ src/styles/index.css
 
 ## 3. The hand-off
 
+`body.is-printing` is kept on for the **entire time the preview is open** (set
+in a mount `useEffect`, removed on unmount), NOT toggled per print:
+
 ```js
-function handleBrowserPrint({ title, studentName, studentDate }) {
-  document.title = buildFilename({ title, studentName, studentDate });
+useEffect(() => {                       // PrintPreview, on open/close
+  const prevTitle = document.title;
   document.body.classList.add('is-printing');
-
-  const restore = onceOnly(() => {
-    document.title = prevTitle;
+  return () => {
     document.body.classList.remove('is-printing');
-  });
-  window.addEventListener('afterprint', restore);
-  setTimeout(restore, 6000);     // hard fallback — some browsers skip afterprint
+    document.title = prevTitle;
+  };
+}, []);
 
-  window.print();
-}
+useEffect(() => {                       // keep the Save-as-PDF filename current
+  document.title = buildFilename({ title, studentName, studentDate });
+}, [title, studentName, studentDate]);
+
+function handleDownload() { window.print(); }   // the toolbar button
 ```
 
-- **`document.title`** is what every browser uses as the default
-  filename when the user picks "Save as PDF" from the system dialog.
-  Restored on `afterprint`.
-- **`body.is-printing`** scopes every `@media print` rule so the screen
-  view is never affected accidentally (someone hits Cmd+P from the main
-  app and the page goes blank? No — without `is-printing`, the rules
-  don't fire).
-- **The 6-second timer** is a belt-and-braces restore: Safari and some
-  embedded browsers don't fire `afterprint` reliably.
+- **`body.is-printing`** scopes every `@media print` rule, so keeping it on
+  while the preview is open has **zero screen effect** (the rules only fire
+  when actually printing). The payoff: EVERY print path produces the clean
+  sheet — our button, `Ctrl/Cmd+P`, and crucially the **mobile browser's own
+  print / share menu** (which never touches our button).
+- **Why this replaced the old toggle-at-click approach:** on mobile that
+  failed two ways — the browser menu skips our button (so `is-printing` was
+  never added), and the old 6-second auto-restore fired before the OS finished
+  rendering the print, both leaking the live app chrome onto the page.
+- **`document.title`** is the default "Save as PDF" filename; a second effect
+  keeps it synced to the cover fields and the mount effect restores it on close.
+- **Orientation:** `@page { size: A4 landscape }` makes Chrome (desktop +
+  Android) print landscape by default. iOS Safari ignores `@page size`, so a
+  mobile-only toolbar hint nudges the user to pick 가로 in the print sheet.
 
 ## 4. @media print rules
 
