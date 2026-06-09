@@ -88,6 +88,24 @@ export function extractFinalAnswer(value) {
   return lines.length ? lines[lines.length - 1] : str;
 }
 
+/**
+ * An answer entry is either a plain string (the answer, no worked solution)
+ * or `{ a, s }` where `a` is the final answer and `s` the step-by-step
+ * solution. `answerOf` returns the answer-only view; `solutionOf` returns
+ * the full solution (falling back to the answer when there are no steps).
+ */
+export function answerOf(value) {
+  if (value == null) return value;
+  if (typeof value === 'object') return value.a;
+  return extractFinalAnswer(value);
+}
+
+export function solutionOf(value) {
+  if (value == null) return value;
+  if (typeof value === 'object') return value.s ?? value.a;
+  return value;
+}
+
 function renderInline(str) {
   const parts = str.split(/(\$[^$]+\$)/g).filter(Boolean);
   return parts.map((part, idx) => {

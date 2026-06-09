@@ -218,9 +218,13 @@ accounts for fractions, roots and matrices). Estimates are deliberately
 conservative — over-estimating wastes a little paper, under-estimating would
 clip. A chapter that overflows simply re-emits its header on the next page.
 
-`mode` is auto-picked per notebook: **`solution`** (1-up, full-width — for
-multi-line `\n` solutions, so wide matrices/steps never crowd) if any selected
-answer contains a `\n`, else **`compact`** (the classic 2-up final-answer grid).
+`mode` follows the notebook's `solutionMode` (toolbar toggle 답만 / 풀이):
+**`answer`** renders `answerOf(value)` at 11 pt, **`solution`** renders
+`solutionOf(value)` denser at 9 pt. Both lay out as a fixed-height
+`column-count: 2` flow (NOT a grid): columns fill column-major, so item-height
+variance can't overflow a row — pagination only has to keep each page's total
+content within two columns. The answer section starts on an odd page (a blank
+filler sheet is slipped in when needed) so duplex prints begin on a fresh face.
 
 ## 7. Answer rendering quirks
 

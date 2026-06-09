@@ -1,7 +1,7 @@
 import { useCartStore } from '../store/cartStore.js';
 import { IconCart, IconClose, IconEmptyBox, IconPrint, IconTrash } from './Icons.jsx';
 import { parseProblemId } from '../config.js';
-import AnswerText, { extractFinalAnswer } from './AnswerText.jsx';
+import AnswerText, { answerOf } from './AnswerText.jsx';
 import ANSWERS from '../data/answers.js';
 
 export default function Cart({ onCreate, className = '', variant = 'panel', onClose }) {
@@ -66,7 +66,7 @@ export default function Cart({ onCreate, className = '', variant = 'panel', onCl
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-slate-900">{id}</p>
                     <p className="truncate text-xs text-slate-500">
-                      답: <AnswerText value={extractFinalAnswer(ANSWERS[id])} />
+                      답: <AnswerText value={answerOf(ANSWERS[id])} />
                     </p>
                   </div>
                   <button
