@@ -3,7 +3,6 @@ import { buildImageUrl, getCategory, parseProblemId } from '../data/catalog.js';
 import ProblemImage from './ProblemImage.jsx';
 import { IconCheck, IconPlus } from './Icons.jsx';
 import { useCartStore } from '../store/cartStore.js';
-import { useToastStore } from '../store/toastStore.js';
 import ANSWERS from '../data/answers.js';
 
 export default function ProblemGrid({ category }) {
@@ -40,16 +39,14 @@ export default function ProblemGrid({ category }) {
 function ProblemCard({ id, category, number }) {
   const selected = useCartStore((s) => s.items.includes(id));
   const toggle = useCartStore((s) => s.toggle);
-  const toast = useToastStore((s) => s.show);
   const src = buildImageUrl(category, number);
   // Legacy problems are tall/narrow; lecture problems (단원→강) are wide
   // statement blocks, so give those cards a landscape frame.
   const ratio = getCategory(category)?.kind === 'lecture' ? '4 / 3' : '3 / 4';
 
   function onClick() {
-    const result = toggle(id);
-    if (result === 'added') toast(`${id} 담음`, { tone: 'success' });
-    else toast(`${id} 제거됨`);
+    // No toast on add/remove — selecting many problems shouldn't spam popups.
+    toggle(id);
   }
 
   return (

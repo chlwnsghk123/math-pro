@@ -36,7 +36,7 @@ export const useNotebookStore = create(
         const now = Date.now();
         const nb = {
           id,
-          title: (title || '').trim() || '오답 노트',
+          title: (title || '').trim(),
           studentName: (studentName || '').trim(),
           studentDate: studentDate || '',
           problemIds: [...problemIds].sort(compareProblemIds),

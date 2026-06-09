@@ -21,6 +21,7 @@ import {
 import ANSWERS from './data/answers.js';
 import { useCartStore } from './store/cartStore.js';
 import { useNotebookStore } from './store/notebookStore.js';
+import { usePrefsStore } from './store/prefsStore.js';
 
 export default function App() {
   const cartCount = useCartStore((s) => s.items.length);
@@ -50,18 +51,27 @@ export default function App() {
     BOOKS.find((b) => categoriesForBook(b.id).some((c) => (counts[c.code] ?? 0) > 0))?.id ||
     BOOKS[0].id;
 
-  const [book, setBook] = useState(defaultBook);
-  const [tab, setTab] = useState(() => firstCategoryOf(defaultBook));
+  // The selected 문제집 is remembered across sessions (prefs).
+  const prefBook = usePrefsStore((s) => s.book);
+  const setPrefBook = usePrefsStore((s) => s.setBook);
+  const initialBook = prefBook && getBook(prefBook) ? prefBook : defaultBook;
+
+  const [book, setBook] = useState(initialBook);
+  const [tab, setTab] = useState(() => firstCategoryOf(initialBook));
 
   function handleBook(id) {
     setBook(id);
+    setPrefBook(id);
     setTab(firstCategoryOf(id));
   }
 
   // Jump from search: switch to the problem's book + unit, then it can be added.
   function handleJump(p) {
     const b = bookIdOf(p.category);
-    if (b) setBook(b);
+    if (b) {
+      setBook(b);
+      setPrefBook(b);
+    }
     setTab(p.category);
   }
 

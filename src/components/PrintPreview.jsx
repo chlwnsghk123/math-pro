@@ -4,6 +4,7 @@ import ANSWERS from '../data/answers.js';
 import AnswerText, { answerOf, solutionOf } from './AnswerText.jsx';
 import { IconBack, IconChevronDown, IconPrint, IconSettings } from './Icons.jsx';
 import { useNotebookStore } from '../store/notebookStore.js';
+import { usePrefsStore } from '../store/prefsStore.js';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Design tokens (lifted from the Claude Design handoff bundle).
@@ -35,6 +36,10 @@ const PROBLEMS_PER_PAGE = 4;
 
 export default function PrintPreview({ notebook, onClose }) {
   const updateNotebook = useNotebookStore((s) => s.update);
+  // Changing the answer-sheet settings here also updates the persisted
+  // defaults, so the next notebook you create inherits them.
+  const setPrefSolutionMode = usePrefsStore((s) => s.setSolutionMode);
+  const setPrefHandwriting = usePrefsStore((s) => s.setHandwriting);
 
   // Edits to the cover fields are written straight back to the notebook
   // so the saved snapshot stays in sync. The notebook prop drives all
@@ -58,8 +63,14 @@ export default function PrintPreview({ notebook, onClose }) {
   const setTitle = (v) => updateNotebook(notebook.id, { title: v });
   const setStudentName = (v) => updateNotebook(notebook.id, { studentName: v });
   const setStudentDate = (v) => updateNotebook(notebook.id, { studentDate: v });
-  const setSolutionMode = (v) => updateNotebook(notebook.id, { solutionMode: v });
-  const setHandwriting = (v) => updateNotebook(notebook.id, { handwriting: v });
+  const setSolutionMode = (v) => {
+    updateNotebook(notebook.id, { solutionMode: v });
+    setPrefSolutionMode(v);
+  };
+  const setHandwriting = (v) => {
+    updateNotebook(notebook.id, { handwriting: v });
+    setPrefHandwriting(v);
+  };
 
   // Keep `body.is-printing` set for the WHOLE time the preview is open, not
   // just during window.print(). The @media print rules are scoped to that
@@ -357,7 +368,7 @@ function PageHeader({ isFirstPage, title, studentName, studentDate, unitCode, un
               paddingBottom: '1.5mm',
             }}
           >
-            {title || '오답 노트'}
+            {title || ' '}
           </h1>
           <div
             style={{
