@@ -13,7 +13,7 @@ export default function Cart({ onCreate, className = '', variant = 'panel', onCl
 
   return (
     <aside
-      className={`flex min-h-0 flex-col rounded-2xl bg-white shadow-card ring-1 ring-slate-100 ${className}`}
+      className={`flex min-h-0 flex-col rounded-3xl bg-white shadow-card ring-1 ring-slate-100 ${className}`}
     >
       <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
         <div className="flex items-center gap-2">
@@ -91,9 +91,10 @@ export default function Cart({ onCreate, className = '', variant = 'panel', onCl
           type="button"
           disabled={!hasItems}
           onClick={onCreate}
-          className="btn-primary w-full"
+          className="btn-primary w-full !rounded-2xl !py-3.5 text-[15px]"
         >
           <IconPrint className="h-4 w-4" /> 오답노트 생성
+          {hasItems && <span className="font-bold tabular-nums">· {items.length}문항</span>}
         </button>
         {!hasItems && (
           <p className="mt-2 text-center text-[11px] text-slate-400">

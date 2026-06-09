@@ -9,9 +9,9 @@ import { IconChevronDown } from './Icons.jsx';
 export default function Navigator({ book, category, counts, onBook, onCategory }) {
   const groups = categoryGroupsForBook(book);
   return (
-    <div className="sticky top-0 z-20 -mx-4 flex flex-col gap-2.5 border-b border-slate-100 bg-white/90 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:border-slate-100 sm:px-3 sm:shadow-soft">
+    <div className="sticky top-0 z-20 -mx-4 flex flex-col gap-3 border-b border-slate-100/80 bg-white/80 px-4 py-3.5 backdrop-blur-xl sm:mx-0 sm:rounded-3xl sm:border sm:border-slate-100 sm:px-4 sm:shadow-soft">
       {/* 문제집 (book) selector */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-slate-400">
           문제집
         </span>
@@ -19,7 +19,7 @@ export default function Navigator({ book, category, counts, onBook, onCategory }
           <select
             value={book}
             onChange={(e) => onBook(e.target.value)}
-            className="w-full cursor-pointer appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2 pl-3 pr-9 text-sm font-semibold text-slate-800 transition focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:w-auto"
+            className="w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50 py-2 pl-3.5 pr-9 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-100 sm:w-auto"
           >
             {BOOKS.map((b) => (
               <option key={b.id} value={b.id}>
@@ -36,7 +36,7 @@ export default function Navigator({ book, category, counts, onBook, onCategory }
         {groups.map((grp) => (
           <div key={grp.key} className="flex flex-wrap items-center gap-1.5">
             {grp.group && (
-              <span className="mr-0.5 shrink-0 text-[11px] font-bold text-slate-400">
+              <span className="mr-0.5 shrink-0 text-[11px] font-bold uppercase tracking-wide text-slate-400">
                 {grp.group}
               </span>
             )}
@@ -49,16 +49,16 @@ export default function Navigator({ book, category, counts, onBook, onCategory }
                   role="tab"
                   aria-selected={active}
                   onClick={() => onCategory(c.code)}
-                  className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition active:scale-[0.97] ${
                     active
                       ? 'bg-brand-500 text-white shadow-soft'
-                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
                   <span>{c.tab}</span>
                   <span
-                    className={`rounded-full px-1.5 text-[10px] font-semibold ${
-                      active ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500'
+                    className={`rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${
+                      active ? 'bg-white/25 text-white' : 'bg-white text-slate-400'
                     }`}
                   >
                     {count}
