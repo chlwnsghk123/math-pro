@@ -42,6 +42,9 @@ function ProblemCard({ id, category, number }) {
   const toggle = useCartStore((s) => s.toggle);
   const toast = useToastStore((s) => s.show);
   const src = buildImageUrl(category, number);
+  // Legacy problems are tall/narrow; lecture problems (단원→강) are wide
+  // statement blocks, so give those cards a landscape frame.
+  const ratio = getCategory(category)?.kind === 'lecture' ? '4 / 3' : '3 / 4';
 
   function onClick() {
     const result = toggle(id);
@@ -60,7 +63,7 @@ function ProblemCard({ id, category, number }) {
           : 'ring-slate-100 hover:ring-slate-200'
       }`}
     >
-      <ProblemImage src={src} alt={`${id} 문제 이미지`} ratio="3 / 4" />
+      <ProblemImage src={src} alt={`${id} 문제 이미지`} ratio={ratio} />
       <div className="flex items-center justify-between px-1 pb-0.5">
         <span className="text-sm font-semibold text-slate-900">{id}</span>
         <span
