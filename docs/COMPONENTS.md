@@ -34,11 +34,13 @@ Free-form id search ("9-30") plus an autocomplete dropdown that filters
 tabs to the matched grade. Validates id via `parseProblemId`; if the id
 isn't in `ANSWERS`, toasts "찾을 수 없습니다".
 
-### `Tabs.jsx`
-Grade tabs derived from `CATEGORIES`. Props: `active`, `onChange`,
-`counts` (a `{ [category]: number }` map). Sticky at the top of the
-problem column. Active tab uses the brand blue pill; inactive tabs are
-text-only with a count chip.
+### `Navigator.jsx`
+Two-level navigation. Props: `book`, `category`, `counts`
+(`{ [category]: number }`), `onBook`, `onCategory`. A 문제집 `<select>`
+(from `BOOKS`) picks the book; below it the selected book's 단원/강 chips
+(`categoryGroupsForBook`) render as **wrapping** rows — no horizontal scroll
+however many units a book has. Active chip is the brand blue pill with a
+count chip. Sticky at the top of the problem column.
 
 ### `ProblemGrid.jsx`
 For a given `category` prop, iterates `Object.keys(ANSWERS)`, parses

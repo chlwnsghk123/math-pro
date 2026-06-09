@@ -14,7 +14,7 @@ src/main.jsx                                     ← React root
         │   ├── SearchBar                        ← "9-30" → jumps tab, can add
         │   └── "내 오답노트 (N)" button         ← opens NotebookList
         ├── main
-        │   ├── Tabs                             ← grade selector
+        │   ├── Navigator                       ← 문제집 + 단원/강 selector
         │   ├── ProblemGrid                      ← cards for selected grade
         │   │   └── ProblemImage                 ← lazy <img>, fallback UI
         │   └── Cart (desktop sidebar)           ← selected problems

@@ -67,11 +67,11 @@ images followed by a typeset answer key (KaTeX).
 └── src/
     ├── main.jsx               ← React mount + KaTeX CSS import
     ├── App.jsx                ← top-level screen router (cart / list / preview)
-    ├── config.js              ← CATALOG (single source of truth), CATEGORIES,
-    │                            CATEGORY_GROUPS, CHAPTERS, getCategory,
-    │                            buildImageUrl, parseProblemId, compareProblemIds
     │
     ├── data/
+    │   ├── catalog.js         ← BOOKS (문제집) + CATALOG (single source of truth),
+    │   │                        getBook/getCategory, categoryGroupsForBook,
+    │   │                        buildImageUrl, parseProblemId, compareProblemIds
     │   └── answers.js         ← THE answer-key data — 285 entries (124 legacy
     │                            + 161 worked-solution entries for Ⅳ·Ⅴ)
     │
@@ -86,8 +86,8 @@ images followed by a typeset answer key (KaTeX).
     └── components/
         ├── App-level
         │   ├── SearchBar.jsx          ← jump to a problem by id (e.g. "9-30")
-        │   ├── Tabs.jsx               ← per-grade tabs
-        │   ├── ProblemGrid.jsx        ← grid of problem cards for one grade
+        │   ├── Navigator.jsx          ← 문제집 dropdown + wrapping 단원/강 chips
+        │   ├── ProblemGrid.jsx        ← grid of problem cards for one category
         │   ├── ProblemImage.jsx       ← lazy <img> with skeleton + fallback
         │   ├── Cart.jsx               ← desktop sidebar (selected problems)
         │   └── MobileCartBar.jsx      ← mobile bottom-sheet version of Cart
@@ -118,10 +118,15 @@ manually opening the dev server and stepping through the flows in
 
 ## 5. Conventions worth knowing
 
-### Problem IDs & the catalog
+### Books, problem IDs & the catalog
 
-Every category (= one tab, one print chapter, one answer-key section) is one
-entry in **`CATALOG`** (`src/config.js`). Two `kind`s:
+`src/data/catalog.js` is the single source of truth. **`BOOKS`** (문제집) is the
+top nav level — e.g. `풍산자 라이트유형 · 공통수학(상)` (codes 7–12) and
+`베이직 쎈 · 공통수학(상)` (Ⅳ·Ⅴ). Add a book there, tag its categories with
+`book: <id>`, and the navigation picks it up.
+
+Every category (= one 단원/강 chip, one print chapter, one answer-key section)
+is one entry in **`CATALOG`**, carrying its `book`. Two `kind`s:
 
 - **`legacy`** — flat grade folders. id `"9-30"` ↔ `images/09/030.png`
   (grade pad-2, number pad-3).
@@ -131,8 +136,9 @@ entry in **`CATALOG`** (`src/config.js`). Two `kind`s:
 
 Category **codes**: legacy `7…12`; lectures `19,20,21` (Ⅳ 강), `22,23` (Ⅴ 강),
 and `4G`/`5G` for the two 실전감각 UP (기출) sets. `parseProblemId` splits on the
-**last** `-` so alphanumeric codes like `4G-3` parse. Helpers in `config.js`:
-`getCategory(code)`, `CATEGORY_GROUPS` (단원 grouping for the tab bar),
+**last** `-` so alphanumeric codes like `4G-3` parse. Helpers in `catalog.js`:
+`getBook(id)`, `getCategory(code)`, `bookIdOf(code)`,
+`categoryGroupsForBook(bookId)` (단원 grouping for the unit picker),
 `CHAPTERS`, `buildImageUrl`, `compareProblemIds` (orders by catalog index).
 
 ### Answer values

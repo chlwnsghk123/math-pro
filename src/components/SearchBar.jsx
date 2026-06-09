@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { IconClose, IconPlus, IconSearch } from './Icons.jsx';
-import { compareProblemIds, parseProblemId } from '../config.js';
+import { compareProblemIds, parseProblemId } from '../data/catalog.js';
 import { useCartStore } from '../store/cartStore.js';
 import { useToastStore } from '../store/toastStore.js';
 import ANSWERS from '../data/answers.js';

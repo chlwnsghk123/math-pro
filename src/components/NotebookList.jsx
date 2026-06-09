@@ -1,7 +1,7 @@
 import { useNotebookStore, notebookDisplayName } from '../store/notebookStore.js';
 import { useToastStore } from '../store/toastStore.js';
 import { IconBack, IconEmptyBox, IconPrint, IconTrash } from './Icons.jsx';
-import { parseProblemId } from '../config.js';
+import { getCategory, parseProblemId } from '../data/catalog.js';
 
 export default function NotebookList({ onClose, onOpen }) {
   const notebooks = useNotebookStore((s) => s.notebooks);
@@ -113,13 +113,17 @@ function EmptyState() {
 }
 
 function summarizeChapters(ids) {
-  const cats = new Set();
+  const seen = [];
+  const set = new Set();
   for (const id of ids) {
     const p = parseProblemId(id);
-    if (p) cats.add(p.category);
+    if (p && !set.has(p.category)) {
+      set.add(p.category);
+      seen.push(p.category);
+    }
   }
-  const list = Array.from(cats).sort((a, b) => Number(a) - Number(b));
-  if (list.length === 0) return '';
-  if (list.length === 1) return `${list[0]}학년`;
-  return `${list[0]}–${list[list.length - 1]}학년`;
+  const names = seen.map((c) => getCategory(c)?.unitName).filter(Boolean);
+  if (names.length === 0) return '';
+  if (names.length <= 2) return names.join(', ');
+  return `${names[0]} 외 ${names.length - 1}개`;
 }

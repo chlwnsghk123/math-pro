@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { compareProblemIds } from '../config.js';
+import { compareProblemIds } from '../data/catalog.js';
 
 const STORAGE_KEY = 'math-pro:notebooks-v1';
 

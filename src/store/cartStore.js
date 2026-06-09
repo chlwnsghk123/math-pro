@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { compareProblemIds } from '../config.js';
+import { compareProblemIds } from '../data/catalog.js';
 
 /**
  * Cart is intentionally in-memory only — a page refresh wipes the

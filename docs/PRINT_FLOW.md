@@ -38,8 +38,8 @@ src/components/PrintPreview.jsx
     │     └── PageFooter          ← "오답 노트 · Unit XX" + "01 / 04"
     │
     ├── paginateAnswerGroups()    ← packs header/item blocks into A4 sheets by
-    │                                estimated height (no clipping); picks
-    │                                `compact` (2-up) vs `solution` (1-up) mode
+    │                                estimated total height vs the 2-column
+    │                                budget (no clipping); 답만 vs 풀이 mode
     └── AnswerKeyPage (×N)        ← "정답 및 풀이" sheets
           └── AnswerChunk         ← one header + its items (chapter may span
                 └── AnswerText (multiline)   ← `\n` steps / (1)(2)(3) sub-parts
@@ -212,9 +212,11 @@ groupAnswerEntriesByChapter(items)
 ## 6b. Answer / solution pagination
 
 The answer sheet used to be a single fixed page (it clipped once worked
-solutions arrived). Now `paginateAnswerGroups(groups, mode)` packs
-header/item blocks into pages by an **estimated height** (`estimateItemMm`
-accounts for fractions, roots and matrices). Estimates are deliberately
+solutions arrived). Now `paginateAnswerGroups(groups, mode, valueFor)` sums each
+item's **estimated full height** (`estimateItemMm` accounts for fractions, roots
+and matrices) plus headers, and starts a new page when the running total exceeds
+`ANSWER_BUDGET_MM` (≈ two columns minus a margin, so the column-major fill never
+spills a tall item past the second column). Estimates are deliberately
 conservative — over-estimating wastes a little paper, under-estimating would
 clip. A chapter that overflows simply re-emits its header on the next page.
 

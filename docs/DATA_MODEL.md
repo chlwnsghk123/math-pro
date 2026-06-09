@@ -17,11 +17,13 @@ display id     "9-30"        ←→  disk path  "images/09/030.png"
                                   zero-pad to 3 ─────────┘
 ```
 
-### The catalog (single source of truth)
+### Books + catalog (single source of truth)
 
-`CATALOG` in `src/config.js` lists every category. Each entry is `{ code, kind,
-tab, group, unitCode, unitName, … }`. `kind: 'legacy'` → flat grade folders;
-`kind: 'lecture'` → `{ folder, filePrefix }` for the 단원→강 hierarchy.
+`src/data/catalog.js` holds **`BOOKS`** (문제집 — the top nav level) and
+**`CATALOG`** (every category). Each catalog entry is `{ code, book, kind, tab,
+group, unitCode, unitName, … }`: `book` ties it to a BOOKS entry, `kind: 'legacy'`
+→ flat grade folders, `kind: 'lecture'` → `{ folder, filePrefix }` for the
+단원→강 hierarchy, `group` is the 단원 label inside the book.
 
 ```
 codes:  '7' '8' '9' '10' '11' '12'   (legacy)
@@ -33,8 +35,11 @@ codes:  '7' '8' '9' '10' '11' '12'   (legacy)
 
 ```js
 CATEGORIES                = CATALOG.map(c => c.code)   // ordered code list
-CATEGORY_GROUPS           = [{ group, items:[entry…] }, …]  // for the tab bar
-getCategory('20')         = { code:'20', kind:'lecture', unitName:'순열', … }
+getBook('basic-ssen')     = { id, name:'베이직 쎈', subject:'공통수학(상)' }
+bookIdOf('20')            = 'basic-ssen'
+categoriesForBook(id)     = [entry…]                       // a book's categories
+categoryGroupsForBook(id) = [{ group, items:[entry…] }, …] // for the unit picker
+getCategory('20')         = { code:'20', book:'basic-ssen', unitName:'순열', … }
 CHAPTERS['20']            = "20강 순열"      // `${unitCode} ${unitName}`
 
 parseProblemId("9-30")    = { category: '9',  number: 30 }   // legacy
