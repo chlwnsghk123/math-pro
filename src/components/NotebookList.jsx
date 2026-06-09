@@ -11,13 +11,24 @@ export default function NotebookList({ onClose, onOpen }) {
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-canvas-muted">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-soft sm:px-6">
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
-        >
-          <IconBack className="h-4 w-4" /> 돌아가기
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="홈"
+            title="홈으로"
+            className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 font-bold text-white shadow-soft transition hover:brightness-105 active:scale-95"
+          >
+            M
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+          >
+            <IconBack className="h-4 w-4" /> <span className="hidden sm:inline">돌아가기</span>
+          </button>
+        </div>
         <div className="text-sm font-semibold text-slate-900">
           내 오답노트{' '}
           <span className="ml-1 text-slate-400">({notebooks.length})</span>
