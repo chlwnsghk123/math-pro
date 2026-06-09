@@ -47,6 +47,19 @@
 }
 
 /* ============================================================
+ * HANDWRITING answer-sheet mode (.hw-ans)
+ * Korean / plain text uses the handwriting font via an inline style.
+ * Here we also pull the *ordinary* KaTeX atoms (digits, letters, \mathrm)
+ * into the handwriting font, but ONLY .mord — operators (+ − = < > ≤ ≥ →),
+ * the fraction rule and matrix delimiters stay in the KaTeX fonts (listed as
+ * fallbacks) so symbols Gaegu lacks never turn into tofu and stay aligned.
+ * Applies on screen AND print (not scoped to is-printing) for a true WYSIWYG.
+ * ============================================================ */
+.hw-ans .katex .mord {
+  font-family: 'Gaegu', 'Pretendard Variable', 'KaTeX_Main', 'KaTeX_Math', sans-serif !important;
+}
+
+/* ============================================================
  * PRINT
  * The app prints straight from the DOM via window.print() — no canvas.
  * While PrintPreview is open it keeps `body.is-printing` on the <body>,

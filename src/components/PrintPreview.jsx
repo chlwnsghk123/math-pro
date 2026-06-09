@@ -1,8 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildImageUrl, getCategory, parseProblemId } from '../data/catalog.js';
 import ANSWERS from '../data/answers.js';
 import AnswerText, { answerOf, solutionOf } from './AnswerText.jsx';
-import { IconBack, IconPrint } from './Icons.jsx';
+import { IconBack, IconChevronDown, IconPrint, IconSettings } from './Icons.jsx';
 import { useNotebookStore } from '../store/notebookStore.js';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -18,10 +18,15 @@ const C = {
   hair: '#cfcfcf',
   hairSoft: '#e2e2e2',
   stage: '#ecebe7',
+  pen: '#1b2a63', // deep navy "pen ink" for the 손글씨 풀이 mode
 };
 const FONT_SANS =
   '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
 const FONT_MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
+// Handwriting stack for the optional 손글씨 풀이 mode. Gaegu (a legible Korean
+// handwriting font) first; Pretendard catches glyphs Gaegu lacks (∴, →, ①–⑤…)
+// so nothing turns into tofu. KaTeX math is handled separately in index.css.
+const FONT_HAND = '"Gaegu", "Pretendard Variable", Pretendard, sans-serif';
 
 /* Page geometry */
 const PAGE_WIDTH_MM = 297;
@@ -39,14 +44,22 @@ export default function PrintPreview({ notebook, onClose }) {
   const studentName = notebook.studentName;
   const studentDate = notebook.studentDate;
 
-  // The answer-key style: 'answer' (final answers only) or 'solution' (full
-  // 식 중심 풀이). Chosen per notebook, editable from the toolbar below.
-  const answerMode = notebook.solutionMode === 'answer' ? 'answer' : 'solution';
+  // The answer-sheet style — chosen per notebook from the 세부 설정 menu:
+  //   'none'     → no answer sheet (problems only)
+  //   'answer'   → final answers only
+  //   'solution' → full 식 중심 풀이
+  const solutionMode = ['none', 'answer', 'solution'].includes(notebook.solutionMode)
+    ? notebook.solutionMode
+    : 'solution';
+  const handwriting = !!notebook.handwriting;
+  // Layout mode for the answer pages (none has no pages).
+  const answerMode = solutionMode === 'answer' ? 'answer' : 'solution';
 
   const setTitle = (v) => updateNotebook(notebook.id, { title: v });
   const setStudentName = (v) => updateNotebook(notebook.id, { studentName: v });
   const setStudentDate = (v) => updateNotebook(notebook.id, { studentDate: v });
-  const setAnswerMode = (v) => updateNotebook(notebook.id, { solutionMode: v });
+  const setSolutionMode = (v) => updateNotebook(notebook.id, { solutionMode: v });
+  const setHandwriting = (v) => updateNotebook(notebook.id, { handwriting: v });
 
   // Keep `body.is-printing` set for the WHOLE time the preview is open, not
   // just during window.print(). The @media print rules are scoped to that
@@ -82,11 +95,12 @@ export default function PrintPreview({ notebook, onClose }) {
   const valueFor = (id) =>
     answerMode === 'solution' ? solutionOf(ANSWERS[id]) : answerOf(ANSWERS[id]);
 
-  /** Answer / solution pages, paginated so nothing clips off a sheet. */
+  /** Answer / solution pages, paginated so nothing clips off a sheet.
+   *  Empty when the notebook is set to 답 없음 (problems only). */
   const answerPages = useMemo(
-    () => paginateAnswerGroups(answerGroups, answerMode, valueFor),
+    () => (solutionMode === 'none' ? [] : paginateAnswerGroups(answerGroups, answerMode, valueFor)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [answerGroups, answerMode],
+    [answerGroups, answerMode, solutionMode],
   );
 
   // The answer section must begin on an ODD page so that, when printed
@@ -120,7 +134,12 @@ export default function PrintPreview({ notebook, onClose }) {
             <IconBack className="h-4 w-4" /> 돌아가기
           </button>
           <div className="flex items-center gap-2 sm:gap-3">
-            <AnswerModeToggle value={answerMode} onChange={setAnswerMode} />
+            <SettingsMenu
+              solutionMode={solutionMode}
+              handwriting={handwriting}
+              onSolutionMode={setSolutionMode}
+              onHandwriting={setHandwriting}
+            />
             <button
               type="button"
               onClick={handleDownload}
@@ -208,6 +227,7 @@ export default function PrintPreview({ notebook, onClose }) {
                   key={`ans-${idx}`}
                   blocks={blocks}
                   mode={answerMode}
+                  handwriting={handwriting}
                   isFirst={idx === 0}
                   pageNumber={answerStart + idx + 1}
                   totalPages={totalPages}
@@ -473,34 +493,106 @@ function ToolbarField({ label, value, onChange, type = 'text', placeholder }) {
   );
 }
 
-/** Segmented toggle: 답만 (answers only) vs 풀이 (full worked solutions). */
-function AnswerModeToggle({ value, onChange }) {
-  const opts = [
+/* ─────────────────────────────────────────────────────────────────────
+ * 세부 설정 — a gear button that opens a popover with the answer-sheet
+ * options (답 없음 / 답만 / 풀이) and the 손글씨 풀이 toggle.
+ * ───────────────────────────────────────────────────────────────────── */
+function SettingsMenu({ solutionMode, handwriting, onSolutionMode, onHandwriting }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e) {
+      if (!ref.current?.contains(e.target)) setOpen(false);
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const sheetOpts = [
+    ['none', '답 없음'],
     ['answer', '답만'],
     ['solution', '풀이'],
   ];
+  const hwDisabled = solutionMode === 'none';
+
   return (
-    <div
-      className="no-print inline-flex items-center rounded-xl bg-slate-100 p-0.5"
-      role="group"
-      aria-label="답지 유형"
-    >
-      {opts.map(([key, label]) => {
-        const active = value === key;
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onChange(key)}
-            aria-pressed={active}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
-              active ? 'bg-white text-slate-900 shadow-soft' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {label}
-          </button>
-        );
-      })}
+    <div ref={ref} className="no-print relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="btn-ghost !px-3 !py-2 text-xs sm:text-sm"
+      >
+        <IconSettings className="h-4 w-4" />
+        <span className="hidden sm:inline">세부 설정</span>
+        <IconChevronDown className={`h-3.5 w-3.5 transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-100">
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                답지
+              </p>
+              <div className="inline-flex w-full items-center rounded-xl bg-slate-100 p-0.5">
+                {sheetOpts.map(([key, label]) => {
+                  const active = solutionMode === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => onSolutionMode(key)}
+                      aria-pressed={active}
+                      className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition ${
+                        active ? 'bg-white text-slate-900 shadow-soft' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <label
+              className={`flex items-center justify-between gap-2 ${
+                hwDisabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'
+              }`}
+            >
+              <span className="text-sm font-semibold text-slate-700">손글씨 풀이</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={handwriting}
+                disabled={hwDisabled}
+                onClick={() => onHandwriting(!handwriting)}
+                className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+                  handwriting && !hwDisabled ? 'bg-brand-500' : 'bg-slate-200'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                    handwriting ? 'left-[1.375rem]' : 'left-0.5'
+                  }`}
+                />
+              </button>
+            </label>
+            <p className="text-[11px] leading-snug text-slate-400">
+              손글씨 풀이는 답지(답만·풀이)를 손으로 쓴 듯한 글씨체로 인쇄합니다.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -626,7 +718,7 @@ function pad2(n) {
  * items under the same header are regrouped into a chunk so a chapter that
  * spills onto the next page just re-emits its header.
  */
-function AnswerKeyPage({ blocks, mode, isFirst, pageNumber, totalPages }) {
+function AnswerKeyPage({ blocks, mode, handwriting, isFirst, pageNumber, totalPages }) {
   const solution = mode === 'solution';
   const sectionTitle = solution ? '정답 및 풀이' : '정답';
   return (
@@ -664,7 +756,7 @@ function AnswerKeyPage({ blocks, mode, isFirst, pageNumber, totalPages }) {
           b.type === 'header' ? (
             <AnswerHeaderBlock key={`h${i}`} header={b} solution={solution} />
           ) : (
-            <AnswerItemBlock key={b.id} item={b} solution={solution} />
+            <AnswerItemBlock key={b.id} item={b} solution={solution} handwriting={handwriting} />
           ),
         )}
       </div>
@@ -724,20 +816,26 @@ function AnswerHeaderBlock({ header, solution }) {
 }
 
 /** One answer / worked-solution entry inside the column flow. */
-function AnswerItemBlock({ item, solution }) {
+function AnswerItemBlock({ item, solution, handwriting }) {
+  // Handwriting fonts read a touch smaller, so bump the size and open up the
+  // line-height for legibility (the "손글씨" review). A deep pen-blue ink
+  // evokes a handwritten key (and still prints dark on a B&W printer).
+  const bodyPt = solution ? (handwriting ? '11.5pt' : '9pt') : handwriting ? '13pt' : '11pt';
+  const numPt = solution ? (handwriting ? '11pt' : '8.5pt') : handwriting ? '12.5pt' : '10.5pt';
+  const lineHeight = solution ? (handwriting ? 1.5 : 1.4) : handwriting ? 1.95 : 2.1;
+  const lineGap = solution ? (handwriting ? 1.7 : 1.3) : 3;
+  const ink = handwriting ? C.pen : C.ink;
   return (
     <div
+      className={handwriting ? 'hw-ans' : undefined}
       style={{
         display: 'grid',
         gridTemplateColumns: solution ? '7mm 1fr' : '9mm 1fr',
         alignItems: 'baseline',
         gap: '2mm',
-        fontSize: solution ? '9pt' : '11pt',
-        color: C.ink,
-        // Compact rows hold inline display-fractions and need a tall
-        // line-height; solution rows stack each step as its own block, so a
-        // tight line-height packs more in.
-        lineHeight: solution ? 1.4 : 2.1,
+        fontSize: bodyPt,
+        color: ink,
+        lineHeight,
         minWidth: 0,
         marginBottom: solution ? '3mm' : '4mm',
         paddingBottom: solution ? '3mm' : '4mm',
@@ -748,10 +846,10 @@ function AnswerItemBlock({ item, solution }) {
     >
       <span
         style={{
-          fontFamily: FONT_MONO,
-          fontWeight: 600,
-          fontSize: solution ? '8.5pt' : '10.5pt',
-          color: C.ink,
+          fontFamily: handwriting ? FONT_HAND : FONT_MONO,
+          fontWeight: handwriting ? 700 : 600,
+          fontSize: numPt,
+          color: ink,
           fontVariantNumeric: 'tabular-nums',
         }}
       >
@@ -759,15 +857,16 @@ function AnswerItemBlock({ item, solution }) {
       </span>
       <span
         style={{
-          fontWeight: 500,
-          color: C.ink,
-          letterSpacing: '-0.01em',
+          fontFamily: handwriting ? FONT_HAND : undefined,
+          fontWeight: handwriting ? 400 : 500,
+          color: ink,
+          letterSpacing: handwriting ? 0 : '-0.01em',
           minWidth: 0,
           wordBreak: 'keep-all',
           overflowWrap: 'anywhere',
         }}
       >
-        <AnswerText value={item.value} multiline lineGap={solution ? 1.3 : 3} />
+        <AnswerText value={item.value} multiline lineGap={lineGap} />
       </span>
     </div>
   );

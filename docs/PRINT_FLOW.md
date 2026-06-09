@@ -282,3 +282,33 @@ can't bleed into the next sheet.
   laser printers but can wash out on cheap inkjet.
 - **The page dimensions are mm, not px.** If you switch to px you'll
   re-introduce scale ambiguity between screen DPI and print DPI.
+
+## 10. 세부 설정 menu — answer-sheet style + handwriting
+
+The PrintPreview toolbar has a **세부 설정** gear (`SettingsMenu`) popover, both
+saved on the notebook:
+
+- **답지** (`solutionMode`): `none` (problems only — no answer sheet, and no
+  odd-page blank filler), `answer` (`answerOf`), `solution` (`solutionOf`).
+- **손글씨 풀이** (`handwriting`, bool): renders the answer items in a
+  handwriting style. Disabled when 답지 = 답 없음.
+
+### Handwriting (손글씨) rendering
+
+Goal: a legible "handwritten key" look without breaking math.
+
+- **Font:** Gaegu (a legible Korean handwriting Google Font), loaded in
+  `index.html`. Stack `FONT_HAND = 'Gaegu', 'Pretendard Variable', …` — glyphs
+  Gaegu lacks (∴ → ① … ⑤) fall back to Pretendard, so nothing becomes tofu.
+- **Math:** we do **not** restyle all of KaTeX. Only `.hw-ans .katex .mord`
+  (digits, letters, `\mathrm`) adopts the handwriting font, with
+  `KaTeX_Main`/`KaTeX_Math` as fallbacks; operators (`+ − = < > ≤ ≥ →`), the
+  fraction rule and matrix delimiters keep their KaTeX fonts so symbols stay
+  correct and aligned. Verified on counting and matrix solutions.
+- **Ink:** `C.pen` (`#1b2a63`, deep navy) — evokes a pen and still prints dark
+  on a B&W printer. KaTeX inherits it via `currentColor`, so math matches.
+- **Legibility:** handwriting fonts read small, so the item font-size is bumped
+  and line-height/line-gap opened up in `AnswerItemBlock`. Section/chapter
+  headers stay in the normal sans for structure.
+- iOS/Android print: the font is a normal webfont, so it prints like any other
+  once loaded (the preview loads it before the user can print).

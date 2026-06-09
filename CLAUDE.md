@@ -156,8 +156,9 @@ and `4G`/`5G` for the two 실전감각 UP (기출) sets. `parseProblemId` splits
 - **Two shapes**: an entry is a string (the answer) **or** `{ a, s }` (answer
   + solution). Only multi-part problems that would print their part-answers
   twice use the object form. `answerOf` / `solutionOf` (in `AnswerText.jsx`)
-  pick the right view. Notebooks carry `solutionMode` (`'answer'` | `'solution'`)
-  — a toolbar toggle in PrintPreview — choosing which the answer sheet prints.
+  pick the right view. Notebooks carry `solutionMode` (`'none'` | `'answer'` |
+  `'solution'`) and `handwriting` (bool) — set in PrintPreview's **세부 설정**
+  menu — choosing whether/which answer sheet prints and its font.
 - `\frac` → `\dfrac` (and `\binom` → `\dbinom`) in `AnswerText.normalizeForDisplay`.
 - Validate every `$…$` segment with `node scripts/validate-answers.mjs`.
 
@@ -181,8 +182,10 @@ chrome and lays each `[data-pdf-page]` onto one A4-landscape sheet
 (`@page { size: A4 landscape }`; iOS can't be forced, so a mobile hint asks the
 user to pick 가로). The "정답 및 풀이" section is **paginated** in JS
 (`paginateAnswerGroups`) by estimated height vs a two-column budget so it never
-clips — 답만 (final answers) vs 풀이 (worked solutions) per the notebook's
-`solutionMode`. See **docs/PRINT_FLOW.md** for the full story.
+clips. The **세부 설정** menu (gear in the toolbar) picks the answer sheet —
+답 없음 (`none`, problems only) / 답만 (`answer`) / 풀이 (`solution`) — and a
+**손글씨 풀이** toggle that renders it in a handwriting font (Gaegu + pen-blue
+ink; KaTeX symbols stay typeset via font fallback). See **docs/PRINT_FLOW.md**.
 
 ### State boundaries
 
