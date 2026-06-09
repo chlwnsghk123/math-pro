@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import { IconClose, IconPrint } from './Icons.jsx';
 import { useCartStore } from '../store/cartStore.js';
-import { useNotebookStore } from '../store/notebookStore.js';
 import { usePrefsStore } from '../store/prefsStore.js';
-import { useToastStore } from '../store/toastStore.js';
 
 function todayIso() {
   const d = new Date();
@@ -11,11 +9,8 @@ function todayIso() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-export default function CreateNotebookModal({ open, onClose, onCreated }) {
+export default function CreateNotebookModal({ open, onClose, onCreate }) {
   const items = useCartStore((s) => s.items);
-  const clearCart = useCartStore((s) => s.clear);
-  const create = useNotebookStore((s) => s.create);
-  const toast = useToastStore((s) => s.show);
   // New notebooks inherit the last-used answer-sheet settings (persisted).
   const solutionMode = usePrefsStore((s) => s.solutionMode);
   const handwriting = usePrefsStore((s) => s.handwriting);
@@ -48,22 +43,23 @@ export default function CreateNotebookModal({ open, onClose, onCreated }) {
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (items.length === 0) {
-      toast('최소 1문제 이상 선택해주세요', { tone: 'warn' });
-      return;
-    }
-    const id = create({
+    if (items.length === 0) return;
+    // Build a DRAFT — it is not persisted until the user taps 저장 in the
+    // preview. The cart is cleared there, on save (not here), so discarding a
+    // draft keeps your selection.
+    const now = Date.now();
+    onCreate({
+      id: `draft_${now.toString(36)}`,
       title,
       studentName,
       studentDate,
-      problemIds: items,
+      problemIds: [...items],
       solutionMode,
       handwriting,
+      createdAt: now,
+      updatedAt: now,
     });
-    toast(`오답노트가 생성되었습니다 (${items.length}문항)`, { tone: 'success' });
-    clearCart();
     onClose();
-    onCreated?.(id);
   }
 
   return (

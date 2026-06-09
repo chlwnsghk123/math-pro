@@ -3,6 +3,7 @@ import { buildImageUrl, getCategory, parseProblemId } from '../data/catalog.js';
 import ANSWERS from '../data/answers.js';
 import AnswerText, { answerOf, solutionOf } from './AnswerText.jsx';
 import { IconBack, IconChevronDown, IconPrint, IconSettings } from './Icons.jsx';
+import { useCartStore } from '../store/cartStore.js';
 import { useNotebookStore } from '../store/notebookStore.js';
 import { usePrefsStore } from '../store/prefsStore.js';
 
@@ -34,43 +35,68 @@ const PAGE_WIDTH_MM = 297;
 const PAGE_HEIGHT_MM = 210;
 const PROBLEMS_PER_PAGE = 4;
 
-export default function PrintPreview({ notebook, onClose }) {
+export default function PrintPreview({ notebook, isNew, onBack, onHome }) {
+  const createNotebook = useNotebookStore((s) => s.create);
   const updateNotebook = useNotebookStore((s) => s.update);
+  const clearCart = useCartStore((s) => s.clear);
   // Changing the answer-sheet settings here also updates the persisted
   // defaults, so the next notebook you create inherits them.
   const setPrefSolutionMode = usePrefsStore((s) => s.setSolutionMode);
   const setPrefHandwriting = usePrefsStore((s) => s.setHandwriting);
 
-  // Edits to the cover fields are written straight back to the notebook
-  // so the saved snapshot stays in sync. The notebook prop drives all
-  // local values — there is no separate cart-derived state here anymore.
-  const items = notebook.problemIds;
-  const title = notebook.title;
-  const studentName = notebook.studentName;
-  const studentDate = notebook.studentDate;
+  // The notebook is a DRAFT held in local state — nothing persists until the
+  // user taps 저장. `persistedId` is null until first saved; `dirty` tracks
+  // unsaved edits so leaving (홈/돌아가기) can prompt "저장하시겠습니까?".
+  const [draft, setDraft] = useState(notebook);
+  const [persistedId, setPersistedId] = useState(isNew ? null : notebook.id);
+  const [dirty, setDirty] = useState(!!isNew);
+  const [pendingGo, setPendingGo] = useState(null);
 
-  // The answer-sheet style — chosen per notebook from the 세부 설정 menu:
-  //   'none'     → no answer sheet (problems only)
-  //   'answer'   → final answers only
-  //   'solution' → full 식 중심 풀이
-  const solutionMode = ['none', 'answer', 'solution'].includes(notebook.solutionMode)
-    ? notebook.solutionMode
+  const items = draft.problemIds;
+  const title = draft.title;
+  const studentName = draft.studentName;
+  const studentDate = draft.studentDate;
+
+  // The answer-sheet style — chosen from the 세부 설정 menu:
+  //   'none' → no answer sheet · 'answer' → final answers · 'solution' → 풀이
+  const solutionMode = ['none', 'answer', 'solution'].includes(draft.solutionMode)
+    ? draft.solutionMode
     : 'solution';
-  const handwriting = !!notebook.handwriting;
-  // Layout mode for the answer pages (none has no pages).
+  const handwriting = !!draft.handwriting;
   const answerMode = solutionMode === 'answer' ? 'answer' : 'solution';
 
-  const setTitle = (v) => updateNotebook(notebook.id, { title: v });
-  const setStudentName = (v) => updateNotebook(notebook.id, { studentName: v });
-  const setStudentDate = (v) => updateNotebook(notebook.id, { studentDate: v });
+  const patch = (p) => {
+    setDraft((d) => ({ ...d, ...p }));
+    setDirty(true);
+  };
+  const setTitle = (v) => patch({ title: v });
+  const setStudentName = (v) => patch({ studentName: v });
+  const setStudentDate = (v) => patch({ studentDate: v });
   const setSolutionMode = (v) => {
-    updateNotebook(notebook.id, { solutionMode: v });
+    patch({ solutionMode: v });
     setPrefSolutionMode(v);
   };
   const setHandwriting = (v) => {
-    updateNotebook(notebook.id, { handwriting: v });
+    patch({ handwriting: v });
     setPrefHandwriting(v);
   };
+
+  function save() {
+    if (persistedId == null) {
+      const id = createNotebook(draft);
+      setPersistedId(id);
+      clearCart(); // the new notebook captured the cart; clear it now
+    } else {
+      updateNotebook(persistedId, draft);
+    }
+    setDirty(false);
+  }
+
+  // Navigate away; if there are unsaved edits, ask first.
+  function requestExit(go) {
+    if (dirty) setPendingGo(() => go);
+    else go();
+  }
 
   // Keep `body.is-printing` set for the WHOLE time the preview is open, not
   // just during window.print(). The @media print rules are scoped to that
@@ -109,9 +135,12 @@ export default function PrintPreview({ notebook, onClose }) {
   /** Answer / solution pages, paginated so nothing clips off a sheet.
    *  Empty when the notebook is set to 답 없음 (problems only). */
   const answerPages = useMemo(
-    () => (solutionMode === 'none' ? [] : paginateAnswerGroups(answerGroups, answerMode, valueFor)),
+    () =>
+      solutionMode === 'none'
+        ? []
+        : paginateAnswerGroups(answerGroups, answerMode, valueFor, handwriting),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [answerGroups, answerMode, solutionMode],
+    [answerGroups, answerMode, solutionMode, handwriting],
   );
 
   // The answer section must begin on an ODD page so that, when printed
@@ -136,15 +165,27 @@ export default function PrintPreview({ notebook, onClose }) {
       style={{ background: C.stage, fontFamily: FONT_SANS }}
     >
       <header className="print-chrome sticky top-0 z-10 border-b border-slate-200 bg-white shadow-soft">
-        <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
-          >
-            <IconBack className="h-4 w-4" /> 돌아가기
-          </button>
-          <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center justify-between gap-2 px-3 py-3 sm:px-6">
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            {/* Math Pro 로고 = 홈 */}
+            <button
+              type="button"
+              onClick={() => requestExit(onHome)}
+              aria-label="홈"
+              title="홈으로"
+              className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 font-bold text-white shadow-soft transition hover:brightness-105 active:scale-95"
+            >
+              M
+            </button>
+            <button
+              type="button"
+              onClick={() => requestExit(onBack)}
+              className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+            >
+              <IconBack className="h-4 w-4" /> <span className="hidden sm:inline">돌아가기</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <SettingsMenu
               solutionMode={solutionMode}
               handwriting={handwriting}
@@ -153,10 +194,23 @@ export default function PrintPreview({ notebook, onClose }) {
             />
             <button
               type="button"
-              onClick={handleDownload}
-              className="btn-primary"
+              onClick={save}
+              disabled={!dirty}
+              className={`inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2.5 text-sm font-semibold transition active:scale-[0.98] ${
+                dirty
+                  ? 'bg-brand-500 text-white shadow-soft hover:bg-brand-600'
+                  : 'cursor-default bg-slate-100 text-slate-400'
+              }`}
             >
-              <IconPrint className="h-4 w-4" /> 인쇄 / PDF
+              {dirty ? '저장' : '저장됨'}
+            </button>
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:bg-slate-800 active:scale-[0.98]"
+            >
+              <IconPrint className="h-4 w-4" /> <span className="hidden sm:inline">인쇄 / PDF</span>
+              <span className="sm:hidden">인쇄</span>
             </button>
           </div>
         </div>
@@ -248,6 +302,68 @@ export default function PrintPreview({ notebook, onClose }) {
           )}
         </div>
       </div>
+
+      {pendingGo && (
+        <ConfirmExitDialog
+          onSave={() => {
+            save();
+            const go = pendingGo;
+            setPendingGo(null);
+            go();
+          }}
+          onDiscard={() => {
+            const go = pendingGo;
+            setPendingGo(null);
+            go();
+          }}
+          onCancel={() => setPendingGo(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** "저장하시겠습니까?" — shown when leaving the preview with unsaved edits. */
+function ConfirmExitDialog({ onSave, onDiscard, onCancel }) {
+  return (
+    <div className="no-print fixed inset-0 z-50 flex items-center justify-center px-4">
+      <button
+        type="button"
+        aria-label="취소"
+        onClick={onCancel}
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+      />
+      <div className="relative z-10 w-full max-w-xs rounded-3xl bg-white p-5 text-center shadow-card">
+        <h2 className="text-base font-bold text-slate-900">저장하시겠습니까?</h2>
+        <p className="mt-1.5 text-sm text-slate-500">
+          저장하지 않으면 변경사항이 사라집니다.
+        </p>
+        <div className="mt-5 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={onSave}
+            className="btn-primary w-full !rounded-2xl !py-3"
+          >
+            저장하기
+          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onDiscard}
+              className="flex-1 rounded-2xl bg-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+            >
+              저장 안 함
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 rounded-2xl px-3 py-2.5 text-sm font-semibold text-slate-500 transition hover:bg-slate-100"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -277,32 +393,10 @@ const pageStyle = {
 /**
  * Intentionally-blank filler sheet so the answer section starts on an odd
  * page (front face) when printed double-sided. Carries the same
- * `[data-pdf-page]` tag so it occupies exactly one A4 sheet, and a faint
- * centred note that only reads as a watermark on screen / paper.
+ * `[data-pdf-page]` tag so it occupies exactly one A4 sheet.
  */
 function BlankPage() {
-  return (
-    <article
-      data-pdf-page
-      style={{
-        ...pageStyle,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <span
-        style={{
-          fontFamily: FONT_MONO,
-          fontSize: '8pt',
-          letterSpacing: '0.28em',
-          textTransform: 'uppercase',
-          color: C.ink4,
-        }}
-      >
-        이 페이지는 비워 둠
-      </span>
-    </article>
-  );
+  return <article data-pdf-page style={pageStyle} />;
 }
 
 function ProblemPage({
@@ -669,18 +763,20 @@ function ProblemImage({ id }) {
     <img
       src={src}
       alt={id}
-      crossOrigin="anonymous"
       loading="eager"
       decoding="async"
       style={{
         display: 'block',
         alignSelf: 'flex-start',
-        maxWidth: '60%',
-        maxHeight: '80%',
+        maxWidth: '92%',
+        maxHeight: '84%',
         width: 'auto',
         height: 'auto',
         objectFit: 'contain',
-        imageRendering: 'crisp-edges',
+        // `auto` (smooth) — `crisp-edges` made the photographic problem PNGs
+        // look jagged when scaled. crossOrigin removed (no canvas, avoids any
+        // CORS load failure).
+        imageRendering: 'auto',
       }}
     />
   );
@@ -977,7 +1073,7 @@ const ANSWER_COLUMN_MM = 156;
 const ANSWER_BUDGET_MM = ANSWER_COLUMN_MM * 2 - 54; // ≈ 258
 const ANSWER_HEADER_MM = 12;
 
-function paginateAnswerGroups(groups, mode, valueFor) {
+function paginateAnswerGroups(groups, mode, valueFor, handwriting) {
   const pages = [];
   let page = [];
   let used = 0;
@@ -992,7 +1088,7 @@ function paginateAnswerGroups(groups, mode, valueFor) {
     let needHeader = true;
     for (const it of group.items) {
       const value = valueFor(it.id);
-      const itemMm = estimateItemMm(value, mode);
+      const itemMm = estimateItemMm(value, mode, handwriting);
       const inc = (needHeader ? ANSWER_HEADER_MM : 0) + itemMm;
       if (used > 0 && used + inc > ANSWER_BUDGET_MM) {
         flush();
@@ -1015,9 +1111,11 @@ function paginateAnswerGroups(groups, mode, valueFor) {
  * Estimated FULL vertical height (mm) of one answer item. Pagination sums
  * these across all items + headers and compares to the two-column budget;
  * the column flow then fills column-major. Solution mode is 9 pt (smaller
- * per-line); fractions, roots and matrices add height.
+ * per-line); fractions, roots and matrices add height. Handwriting mode uses a
+ * bigger font + looser leading, so its items are taller — inflate the estimate
+ * so it never overruns the sheet.
  */
-function estimateItemMm(value, mode) {
+function estimateItemMm(value, mode, handwriting) {
   const solution = mode === 'solution';
   const lines = estimateLines(value);
   const perLine = solution ? 4 : 6.5;
@@ -1029,7 +1127,9 @@ function estimateItemMm(value, mode) {
     if (rows) lh += rows * (solution ? 3.5 : 5);
     h += lh;
   }
-  return h + 5; // bottom margin + padding + border
+  h += 5; // bottom margin + padding + border
+  // Handwriting font is larger with looser leading → taller items.
+  return handwriting ? h * (solution ? 1.5 : 1.28) : h;
 }
 
 function estimateLines(value) {

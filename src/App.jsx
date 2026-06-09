@@ -26,12 +26,14 @@ import { usePrefsStore } from './store/prefsStore.js';
 export default function App() {
   const cartCount = useCartStore((s) => s.items.length);
   const notebooks = useNotebookStore((s) => s.notebooks);
-  const getNotebook = useNotebookStore((s) => s.notebooks.find);
 
   /** UI state: which screen is overlaying the main view. */
   const [createOpen, setCreateOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
-  const [openNotebookId, setOpenNotebookId] = useState(null);
+  // The notebook being edited in the preview. It's a DRAFT until saved —
+  // `editing` holds the working object, `editingIsNew` whether it's unsaved.
+  const [editing, setEditing] = useState(null);
+  const [editingIsNew, setEditingIsNew] = useState(false);
 
   const counts = useMemo(() => {
     const map = Object.fromEntries(CATEGORIES.map((c) => [c, 0]));
@@ -75,9 +77,21 @@ export default function App() {
     setTab(p.category);
   }
 
-  const openNotebook = openNotebookId
-    ? notebooks.find((nb) => nb.id === openNotebookId)
-    : null;
+  function openEditor(notebook, isNew) {
+    setEditing(notebook);
+    setEditingIsNew(isNew);
+  }
+  // Home = the Math Pro logo: clear every overlay back to the picker screen.
+  function goHome() {
+    setEditing(null);
+    setListOpen(false);
+    setCreateOpen(false);
+  }
+  // Back from the preview → the saved-notebook list.
+  function goBackToList() {
+    setEditing(null);
+    setListOpen(true);
+  }
 
   return (
     <div className="app-root min-h-screen bg-canvas-muted">
@@ -163,23 +177,29 @@ export default function App() {
       <CreateNotebookModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreated={(id) => {
-          setListOpen(true);
-          setOpenNotebookId(id);
+        onCreate={(draft) => {
+          setCreateOpen(false);
+          openEditor(draft, true);
         }}
       />
 
       {listOpen && (
         <NotebookList
-          onClose={() => setListOpen(false)}
-          onOpen={(id) => setOpenNotebookId(id)}
+          onClose={goHome}
+          onOpen={(id) => {
+            const nb = notebooks.find((n) => n.id === id);
+            if (nb) openEditor({ ...nb }, false);
+          }}
         />
       )}
 
-      {openNotebook && (
+      {editing && (
         <PrintPreview
-          notebook={openNotebook}
-          onClose={() => setOpenNotebookId(null)}
+          key={editing.id}
+          notebook={editing}
+          isNew={editingIsNew}
+          onBack={goBackToList}
+          onHome={goHome}
         />
       )}
     </div>
