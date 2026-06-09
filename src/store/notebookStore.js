@@ -16,6 +16,7 @@ const STORAGE_KEY = 'math-pro:notebooks-v1';
  *     studentName: string,    // may be ''
  *     studentDate: string,    // 'YYYY-MM-DD'
  *     problemIds: string[],   // sorted by compareProblemIds
+ *     solutionMode: 'answer' | 'solution',  // answer-key style for printing
  *     createdAt: number,      // ms epoch
  *     updatedAt: number,
  *   }
@@ -29,7 +30,7 @@ export const useNotebookStore = create(
     (set, get) => ({
       notebooks: [],
 
-      create: ({ title, studentName, studentDate, problemIds }) => {
+      create: ({ title, studentName, studentDate, problemIds, solutionMode }) => {
         const id = makeId();
         const now = Date.now();
         const nb = {
@@ -38,6 +39,7 @@ export const useNotebookStore = create(
           studentName: (studentName || '').trim(),
           studentDate: studentDate || '',
           problemIds: [...problemIds].sort(compareProblemIds),
+          solutionMode: solutionMode || 'solution',
           createdAt: now,
           updatedAt: now,
         };

@@ -9,11 +9,11 @@ function normalize(tex) {
 
 let errors = 0;
 let mathSegments = 0;
-for (const [id, value] of Object.entries(ANSWERS)) {
-  const str = String(value);
+
+function checkString(id, label, str) {
   const dollars = (str.match(/\$/g) || []).length;
   if (dollars % 2 !== 0) {
-    console.error(`[${id}] unbalanced $ (count=${dollars})`);
+    console.error(`[${id}${label}] unbalanced $ (count=${dollars})`);
     errors++;
   }
   for (const part of str.split(/(\$[^$]+\$)/g)) {
@@ -23,9 +23,19 @@ for (const [id, value] of Object.entries(ANSWERS)) {
     try {
       katex.renderToString(normalize(m[1]), { throwOnError: true });
     } catch (e) {
-      console.error(`[${id}] KaTeX error in "${m[1]}": ${e.message.split('\n')[0]}`);
+      console.error(`[${id}${label}] KaTeX error in "${m[1]}": ${e.message.split('\n')[0]}`);
       errors++;
     }
+  }
+}
+
+for (const [id, value] of Object.entries(ANSWERS)) {
+  // A value is either a string (answer) or { a, s } (answer + solution).
+  if (value && typeof value === 'object') {
+    checkString(id, '.a', String(value.a ?? ''));
+    checkString(id, '.s', String(value.s ?? ''));
+  } else {
+    checkString(id, '', String(value));
   }
 }
 

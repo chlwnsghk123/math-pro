@@ -147,6 +147,11 @@ and `4G`/`5G` for the two 실전감각 UP (기출) sets. `parseProblemId` splits
   and end with a `∴ …` conclusion line. `AnswerText` (with `multiline`) puts
   each `\n`-line / sub-part in its own block; `extractFinalAnswer(value)`
   returns the text after the last `∴` (used in the cart row).
+- **Two shapes**: an entry is a string (the answer) **or** `{ a, s }` (answer
+  + solution). Only multi-part problems that would print their part-answers
+  twice use the object form. `answerOf` / `solutionOf` (in `AnswerText.jsx`)
+  pick the right view. Notebooks carry `solutionMode` (`'answer'` | `'solution'`)
+  — a toolbar toggle in PrintPreview — choosing which the answer sheet prints.
 - `\frac` → `\dfrac` (and `\binom` → `\dbinom`) in `AnswerText.normalizeForDisplay`.
 - Validate every `$…$` segment with `node scripts/validate-answers.mjs`.
 

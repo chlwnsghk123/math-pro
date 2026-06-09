@@ -89,6 +89,23 @@ const ANSWERS = {
 };
 ```
 
+### Two shapes: string vs `{ a, s }`
+
+An entry value is **either** a plain string (the answer; no detailed solution)
+**or** an object `{ a, s }` where `a` is the final answer and `s` the
+step-by-step solution. Only the few multi-part problems that would otherwise
+print their part-answers twice use the object form; everything else is a
+string whose answer is derived on the fly.
+
+```js
+answerOf(v)    // object → v.a ; string → extractFinalAnswer(v)  (답만 mode)
+solutionOf(v)  // object → v.s ; string → v                      (풀이 mode)
+```
+
+Notebooks carry `solutionMode: 'answer' | 'solution'` (default `'solution'`,
+toggled in the PrintPreview toolbar) which picks `answerOf` vs `solutionOf`
+per entry when building the answer sheets.
+
 ### Rules `AnswerText` enforces
 
 - **Empty / null** → renders an em-dash placeholder.
@@ -144,6 +161,7 @@ type Notebook = {
   studentName: string;       // may be ""
   studentDate: string;       // "YYYY-MM-DD" (HTML date input format)
   problemIds:  string[];     // sorted by compareProblemIds, immutable
+  solutionMode: 'answer' | 'solution';  // answer-key style (default 'solution')
   createdAt:   number;       // Date.now() at creation
   updatedAt:   number;
 };

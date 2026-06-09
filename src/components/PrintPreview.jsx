@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { buildImageUrl, getCategory, parseProblemId } from '../config.js';
 import ANSWERS from '../data/answers.js';
-import AnswerText from './AnswerText.jsx';
+import AnswerText, { answerOf, solutionOf } from './AnswerText.jsx';
 import { IconBack, IconPrint } from './Icons.jsx';
 import { useNotebookStore } from '../store/notebookStore.js';
 
@@ -39,10 +39,14 @@ export default function PrintPreview({ notebook, onClose }) {
   const studentName = notebook.studentName;
   const studentDate = notebook.studentDate;
 
+  // The answer-key style: 'answer' (final answers only) or 'solution' (full
+  // 식 중심 풀이). Chosen per notebook, editable from the toolbar below.
+  const answerMode = notebook.solutionMode === 'answer' ? 'answer' : 'solution';
+
   const setTitle = (v) => updateNotebook(notebook.id, { title: v });
   const setStudentName = (v) => updateNotebook(notebook.id, { studentName: v });
   const setStudentDate = (v) => updateNotebook(notebook.id, { studentDate: v });
-
+  const setAnswerMode = (v) => updateNotebook(notebook.id, { solutionMode: v });
 
   /** Problem pages: chunk by chapter, then split into pages of 4. */
   const pages = useMemo(() => annotatePages(chunkByChapter(items, PROBLEMS_PER_PAGE)), [items]);
@@ -50,16 +54,15 @@ export default function PrintPreview({ notebook, onClose }) {
   /** Answer key: one group per chapter, in cart order. */
   const answerGroups = useMemo(() => groupAnswerEntriesByChapter(items), [items]);
 
-  // `solution` mode when any selected answer is a multi-line worked
-  // solution (식 중심 풀이); otherwise the compact 2-up final-answer grid.
-  const answerMode = useMemo(
-    () => (items.some((id) => String(ANSWERS[id] ?? '').includes('\n')) ? 'solution' : 'compact'),
-    [items],
-  );
+  // The string actually rendered for each id depends on the mode:
+  // answers-only vs full worked solution.
+  const valueFor = (id) =>
+    answerMode === 'solution' ? solutionOf(ANSWERS[id]) : answerOf(ANSWERS[id]);
 
   /** Answer / solution pages, paginated so nothing clips off a sheet. */
   const answerPages = useMemo(
-    () => paginateAnswerGroups(answerGroups, answerMode),
+    () => paginateAnswerGroups(answerGroups, answerMode, valueFor),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [answerGroups, answerMode],
   );
 
@@ -91,13 +94,16 @@ export default function PrintPreview({ notebook, onClose }) {
           >
             <IconBack className="h-4 w-4" /> 돌아가기
           </button>
-          <button
-            type="button"
-            onClick={handleDownload}
-            className="btn-primary"
-          >
-            <IconPrint className="h-4 w-4" /> 인쇄 / PDF
-          </button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <AnswerModeToggle value={answerMode} onChange={setAnswerMode} />
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="btn-primary"
+            >
+              <IconPrint className="h-4 w-4" /> 인쇄 / PDF
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-1 gap-2 px-4 pb-3 sm:grid-cols-[2fr_1fr_1fr] sm:px-6">
           <ToolbarField
@@ -434,6 +440,38 @@ function ToolbarField({ label, value, onChange, type = 'text', placeholder }) {
   );
 }
 
+/** Segmented toggle: 답만 (answers only) vs 풀이 (full worked solutions). */
+function AnswerModeToggle({ value, onChange }) {
+  const opts = [
+    ['answer', '답만'],
+    ['solution', '풀이'],
+  ];
+  return (
+    <div
+      className="no-print inline-flex items-center rounded-xl bg-slate-100 p-0.5"
+      role="group"
+      aria-label="답지 유형"
+    >
+      {opts.map(([key, label]) => {
+        const active = value === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange(key)}
+            aria-pressed={active}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+              active ? 'bg-white text-slate-900 shadow-soft' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** "2026-05-23" → "2026. 05. 23." Empty / invalid → empty string. */
 function formatKoreanDate(iso) {
   if (!iso) return '';
@@ -556,21 +594,8 @@ function pad2(n) {
  * spills onto the next page just re-emits its header.
  */
 function AnswerKeyPage({ blocks, mode, isFirst, pageNumber, totalPages }) {
-  const chunks = [];
-  let cur = null;
-  for (const b of blocks) {
-    if (b.type === 'header') {
-      cur = { header: b, items: [] };
-      chunks.push(cur);
-    } else {
-      if (!cur) {
-        cur = { header: null, items: [] };
-        chunks.push(cur);
-      }
-      cur.items.push(b);
-    }
-  }
-
+  const solution = mode === 'solution';
+  const sectionTitle = solution ? '정답 및 풀이' : '정답';
   return (
     <article data-pdf-page style={pageStyle}>
       <header style={{ marginBottom: '4mm', flexShrink: 0 }}>
@@ -585,26 +610,35 @@ function AnswerKeyPage({ blocks, mode, isFirst, pageNumber, totalPages }) {
               color: C.ink,
             }}
           >
-            정답 및 풀이{isFirst ? '' : ' (계속)'}
+            {sectionTitle}{isFirst ? '' : ' (계속)'}
           </h1>
         </div>
       </header>
 
-      <div style={{ flex: 1, padding: '3mm 0', minHeight: 0 }}>
-        {chunks.map((c, idx) => (
-          <AnswerChunk
-            key={idx}
-            header={c.header}
-            items={c.items}
-            mode={mode}
-            isLast={idx === chunks.length - 1}
-          />
-        ))}
+      {/* Fixed-height column-count flow fills column-major, so item-height
+          variance can't overflow a row the way a 2-col grid would. Pagination
+          guarantees the page's content fits two columns. */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          padding: '3mm 0',
+          columnCount: 2,
+          columnGap: solution ? '8mm' : '12mm',
+        }}
+      >
+        {blocks.map((b, i) =>
+          b.type === 'header' ? (
+            <AnswerHeaderBlock key={`h${i}`} header={b} solution={solution} />
+          ) : (
+            <AnswerItemBlock key={b.id} item={b} solution={solution} />
+          ),
+        )}
       </div>
 
       <PageFooter
         unitCode={null}
-        unitName="정답 및 풀이"
+        unitName={sectionTitle}
         pageNumber={pageNumber}
         totalPages={totalPages}
       />
@@ -612,106 +646,97 @@ function AnswerKeyPage({ blocks, mode, isFirst, pageNumber, totalPages }) {
   );
 }
 
-function AnswerChunk({ header, items, mode, isLast }) {
+/** Chapter header inside the answer/solution column flow. */
+function AnswerHeaderBlock({ header, solution }) {
   return (
-    <section style={{ marginBottom: isLast ? 0 : '7mm' }}>
-      {header && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: '4mm',
-            borderBottom: `1.5px solid ${C.ink}`,
-            paddingBottom: '2mm',
-            marginBottom: '4mm',
-            wordBreak: 'keep-all',
-          }}
-        >
-          <span
-            style={{
-              fontFamily: FONT_MONO,
-              fontSize: '11pt',
-              fontWeight: 600,
-              color: C.ink,
-              letterSpacing: '-0.01em',
-              flexShrink: 0,
-            }}
-          >
-            {header.unitCode}
-          </span>
-          <span
-            style={{
-              fontSize: '11.5pt',
-              fontWeight: 700,
-              color: C.ink,
-              letterSpacing: '-0.015em',
-              wordBreak: 'keep-all',
-              flex: 1,
-            }}
-          >
-            {header.unitName}
-          </span>
-        </div>
-      )}
-      <ol
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: '4mm',
+        borderBottom: `1.5px solid ${C.ink}`,
+        paddingBottom: '1.5mm',
+        marginBottom: '3mm',
+        breakInside: 'avoid',
+        breakAfter: 'avoid-column',
+        pageBreakInside: 'avoid',
+        wordBreak: 'keep-all',
+      }}
+    >
+      <span
         style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'grid',
-          // Compact final answers pack two-up; worked solutions get the
-          // full sheet width so multi-line steps and matrices never crowd.
-          gridTemplateColumns: mode === 'solution' ? '1fr' : '1fr 1fr',
-          columnGap: '10mm',
-          rowGap: mode === 'solution' ? '5mm' : '5mm',
+          fontFamily: FONT_MONO,
+          fontSize: solution ? '10pt' : '11pt',
+          fontWeight: 600,
+          color: C.ink,
+          letterSpacing: '-0.01em',
+          flexShrink: 0,
         }}
       >
-        {items.map(({ id, displayNumber }) => (
-          <li
-            key={id}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '9mm 1fr',
-              alignItems: 'baseline',
-              gap: '3mm',
-              fontSize: '11pt',
-              color: C.ink,
-              // Compact rows hold inline display-fractions, so they need a
-              // tall line-height; solution rows stack each step as its own
-              // block, so a normal line-height keeps them tight.
-              lineHeight: mode === 'solution' ? 1.55 : 2.1,
-              minWidth: 0,
-              paddingBottom: '4mm',
-              borderBottom: `1px dashed ${C.hairSoft}`,
-            }}
-          >
-            <span
-              style={{
-                fontFamily: FONT_MONO,
-                fontWeight: 600,
-                fontSize: '10.5pt',
-                color: C.ink,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {displayNumber}.
-            </span>
-            <span
-              style={{
-                fontWeight: 500,
-                color: C.ink,
-                letterSpacing: '-0.01em',
-                minWidth: 0,
-                wordBreak: 'keep-all',
-                overflowWrap: 'anywhere',
-              }}
-            >
-              <AnswerText value={ANSWERS[id]} multiline lineGap={mode === 'solution' ? 1.6 : 3} />
-            </span>
-          </li>
-        ))}
-      </ol>
-    </section>
+        {header.unitCode}
+      </span>
+      <span
+        style={{
+          fontSize: solution ? '10.5pt' : '11.5pt',
+          fontWeight: 700,
+          color: C.ink,
+          letterSpacing: '-0.015em',
+          wordBreak: 'keep-all',
+        }}
+      >
+        {header.unitName}
+      </span>
+    </div>
+  );
+}
+
+/** One answer / worked-solution entry inside the column flow. */
+function AnswerItemBlock({ item, solution }) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: solution ? '7mm 1fr' : '9mm 1fr',
+        alignItems: 'baseline',
+        gap: '2mm',
+        fontSize: solution ? '9pt' : '11pt',
+        color: C.ink,
+        // Compact rows hold inline display-fractions and need a tall
+        // line-height; solution rows stack each step as its own block, so a
+        // tight line-height packs more in.
+        lineHeight: solution ? 1.4 : 2.1,
+        minWidth: 0,
+        marginBottom: solution ? '3mm' : '4mm',
+        paddingBottom: solution ? '3mm' : '4mm',
+        borderBottom: `1px dashed ${C.hairSoft}`,
+        breakInside: 'avoid',
+        pageBreakInside: 'avoid',
+      }}
+    >
+      <span
+        style={{
+          fontFamily: FONT_MONO,
+          fontWeight: 600,
+          fontSize: solution ? '8.5pt' : '10.5pt',
+          color: C.ink,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {item.displayNumber}.
+      </span>
+      <span
+        style={{
+          fontWeight: 500,
+          color: C.ink,
+          letterSpacing: '-0.01em',
+          minWidth: 0,
+          wordBreak: 'keep-all',
+          overflowWrap: 'anywhere',
+        }}
+      >
+        <AnswerText value={item.value} multiline lineGap={solution ? 1.3 : 3} />
+      </span>
+    </div>
   );
 }
 
@@ -807,7 +832,7 @@ const ANSWER_CONTENT_MM = 158;
 const ANSWER_BUDGET_MM = ANSWER_CONTENT_MM * 0.84;
 const ANSWER_HEADER_MM = 13;
 
-function paginateAnswerGroups(groups, mode) {
+function paginateAnswerGroups(groups, mode, valueFor) {
   const pages = [];
   let page = [];
   let used = 0;
@@ -821,7 +846,8 @@ function paginateAnswerGroups(groups, mode) {
   for (const group of groups) {
     let needHeader = true;
     for (const it of group.items) {
-      const itemMm = estimateItemMm(ANSWERS[it.id], mode);
+      const value = valueFor(it.id);
+      const itemMm = estimateItemMm(value, mode);
       const inc = (needHeader ? ANSWER_HEADER_MM : 0) + itemMm;
       if (used > 0 && used + inc > ANSWER_BUDGET_MM) {
         flush();
@@ -832,7 +858,7 @@ function paginateAnswerGroups(groups, mode) {
         used += ANSWER_HEADER_MM;
         needHeader = false;
       }
-      page.push({ type: 'item', id: it.id, displayNumber: it.displayNumber });
+      page.push({ type: 'item', id: it.id, displayNumber: it.displayNumber, value });
       used += itemMm;
     }
   }
@@ -842,22 +868,23 @@ function paginateAnswerGroups(groups, mode) {
 
 /**
  * Estimated vertical footprint (mm) an answer item contributes to a page.
- * In compact (2-up) mode each item shares a row with a neighbour, so it
- * counts ~half; in solution (1-up) mode it counts full. Fractions, roots
- * and matrices add height on top of the base per-line cost.
+ * BOTH modes are 2-up now, so each item shares a row with a neighbour and
+ * counts ~half. Solution mode uses a smaller font, so its per-line cost is
+ * lower. Fractions, roots and matrices add height on top of the base.
  */
 function estimateItemMm(value, mode) {
+  const solution = mode === 'solution';
   const lines = estimateLines(value);
-  let h = 8; // number cell + item padding/border
+  const perLine = solution ? 4.8 : 6.5;
+  let h = solution ? 6 : 8; // number cell + item padding/border
   for (const ln of lines) {
-    let lh = 6.5;
-    if (/\\[dt]?frac|\\sqrt|\\[dt]?binom/.test(ln)) lh += 3;
+    let lh = perLine;
+    if (/\\[dt]?frac|\\sqrt|\\[dt]?binom/.test(ln)) lh += solution ? 2 : 3;
     const rows = matrixRows(ln);
-    if (rows) lh += rows * 5 + 3;
+    if (rows) lh += rows * (solution ? 4 : 5) + 2;
     h += lh;
   }
-  h += 3;
-  return mode === 'solution' ? h : h * 0.55;
+  return (h + 3) * 0.55; // 2-column → each item ~half a column
 }
 
 function estimateLines(value) {
