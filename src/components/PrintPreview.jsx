@@ -768,8 +768,8 @@ function ProblemImage({ id }) {
       style={{
         display: 'block',
         alignSelf: 'flex-start',
-        maxWidth: '92%',
-        maxHeight: '84%',
+        maxWidth: '60%',
+        maxHeight: '80%',
         width: 'auto',
         height: 'auto',
         objectFit: 'contain',
