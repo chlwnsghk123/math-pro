@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { buildImageUrl, parseProblemId } from '../config.js';
+import { buildImageUrl, getCategory, parseProblemId } from '../config.js';
 import ProblemImage from './ProblemImage.jsx';
 import { IconCheck, IconPlus } from './Icons.jsx';
 import { useCartStore } from '../store/cartStore.js';
@@ -21,9 +21,9 @@ export default function ProblemGrid({ category }) {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-2 rounded-2xl bg-white text-center text-sm text-slate-500 shadow-soft ring-1 ring-slate-100">
         <span className="text-base font-semibold text-slate-700">
-          {category} 카테고리 문제 없음
+          {getCategory(category)?.tab || category} · 문제 없음
         </span>
-        <span>JSON 데이터에 문제가 추가되면 표시됩니다.</span>
+        <span>문제가 추가되면 표시됩니다.</span>
       </div>
     );
   }

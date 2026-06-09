@@ -17,20 +17,36 @@ display id     "9-30"        ←→  disk path  "images/09/030.png"
                                   zero-pad to 3 ─────────┘
 ```
 
+### The catalog (single source of truth)
+
+`CATALOG` in `src/config.js` lists every category. Each entry is `{ code, kind,
+tab, group, unitCode, unitName, … }`. `kind: 'legacy'` → flat grade folders;
+`kind: 'lecture'` → `{ folder, filePrefix }` for the 단원→강 hierarchy.
+
+```
+codes:  '7' '8' '9' '10' '11' '12'   (legacy)
+        '19' '20' '21' '4G'          (Ⅳ 순열과 조합: 강 19/20/21 + 기출 4G)
+        '22' '23' '5G'               (Ⅴ 행렬: 강 22/23 + 기출 5G)
+```
+
 ### Helpers in `src/config.js`
 
 ```js
-CATEGORIES                = ['7', '8', '9', '10', '11', '12']
-CHAPTERS[category]        = "09 이차부등식과 연립이차부등식"   // string
+CATEGORIES                = CATALOG.map(c => c.code)   // ordered code list
+CATEGORY_GROUPS           = [{ group, items:[entry…] }, …]  // for the tab bar
+getCategory('20')         = { code:'20', kind:'lecture', unitName:'순열', … }
+CHAPTERS['20']            = "20강 순열"      // `${unitCode} ${unitName}`
 
-parseProblemId("9-30")    = { category: '9', number: 30 }
-parseProblemId("garbage") = null
-parseProblemId("4-1")     = null     // 4 not in CATEGORIES
+parseProblemId("9-30")    = { category: '9',  number: 30 }   // legacy
+parseProblemId("20-5")    = { category: '20', number: 5 }    // lecture
+parseProblemId("4G-3")    = { category: '4G', number: 3 }    // split on LAST '-'
+parseProblemId("4-1")     = null     // 4 not a catalog code
 
-buildImageUrl('9', 30)
-  = "https://raw.githubusercontent.com/chlwnsghk123/math-pro/main/images/09/030.png"
+buildImageUrl('9', 30)    // legacy → images/09/030.png
+buildImageUrl('20', 5)    // lecture → images/IV_순열과조합/20강_순열/유형05.png
+                          // (folder path is URL-encoded; it has Korean chars)
 
-compareProblemIds(a, b)   = numeric sort by (category, number)
+compareProblemIds(a, b)   = sort by (catalog index, number)
 formatProblemId('9', 30)  = "9-30"
 ```
 
@@ -76,14 +92,20 @@ const ANSWERS = {
 ### Rules `AnswerText` enforces
 
 - **Empty / null** → renders an em-dash placeholder.
-- **`$ … $`** → passed to `react-katex` `InlineMath`. The substring is
-  first run through `normalizeForDisplay(tex)`:
+- **`$ … $`** → passed to `react-katex` `InlineMath` (incl. `\begin{pmatrix}`).
+  The substring is first run through `normalizeForDisplay(tex)`:
   - `\frac` → `\dfrac` (uniform display-style fractions across all answers)
   - `\binom` → `\dbinom`
-- **Multi-part answers** that contain `(2)`, `(3)`, … markers preceded by
-  **two-or-more spaces** are split when the caller passes `multiline`.
-  Each sub-part renders in its own `display: block` span with a 3 mm
-  margin — display-style fractions can't overflow into the next part.
+- **`multiline`** splits the value into stacked blocks on two boundaries:
+  1. explicit `\n` — used by the Ⅳ·Ⅴ **worked solutions** (수능형 식 중심
+     풀이; each step its own line, ending with a `∴ …` conclusion).
+  2. `(2)`, `(3)`, … markers preceded by **two-or-more spaces** (legacy
+     multi-part answers).
+  `lineGap` (mm) tunes the inter-block gap (3 for compact, ~1.6 for solutions).
+- **`extractFinalAnswer(value)`** (exported from `AnswerText.jsx`) returns the
+  text after the last `∴` (else the last line) — used in the cart row so a long
+  solution collapses to just its conclusion.
+- Worked-solution math validity is checked by `node scripts/validate-answers.mjs`.
 
 ### Where the data lives
 
