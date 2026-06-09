@@ -83,15 +83,15 @@ export default function App() {
     <div className="app-root min-h-screen bg-canvas-muted">
       <Toaster />
 
-      <header className="no-print sticky top-0 z-30 border-b border-slate-100 bg-white/85 backdrop-blur">
+      <header className="no-print sticky top-0 z-30 border-b border-slate-100/80 bg-white/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-white font-bold">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 font-bold text-white shadow-soft">
               M
             </span>
             <div className="leading-tight">
-              <h1 className="text-base font-bold text-slate-900">Math Pro</h1>
-              <p className="text-[11px] text-slate-500">오답노트 생성기</p>
+              <h1 className="text-[15px] font-bold tracking-tight text-slate-900">Math Pro</h1>
+              <p className="text-[11px] text-slate-400">오답노트 생성기</p>
             </div>
           </div>
           <div className="hidden flex-1 max-w-md sm:block">
@@ -130,10 +130,20 @@ export default function App() {
               onBook={handleBook}
               onCategory={setTab}
             />
-            <div className="flex items-baseline gap-2 px-1">
-              <span className="text-xs font-semibold text-slate-400">{getBook(book)?.name}</span>
-              <span className="text-slate-300">·</span>
-              <h2 className="text-sm font-bold text-slate-800">{getCategory(tab)?.unitName}</h2>
+            <div className="flex items-end justify-between gap-3 px-1">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">
+                  {getBook(book)?.name}
+                </p>
+                <h2 className="mt-0.5 truncate text-xl font-bold tracking-tight text-slate-900">
+                  {getCategory(tab)?.unitName}
+                </h2>
+              </div>
+              {(counts[tab] ?? 0) > 0 && (
+                <span className="shrink-0 pb-1 text-xs font-medium text-slate-400">
+                  문제 <span className="font-bold text-slate-700">{counts[tab]}</span>
+                </span>
+              )}
             </div>
             <ProblemGrid category={tab} />
           </section>

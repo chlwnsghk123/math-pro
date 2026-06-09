@@ -54,26 +54,26 @@ function ProblemCard({ id, category, number }) {
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`group relative flex flex-col gap-2 rounded-2xl bg-white p-2 text-left shadow-soft ring-1 transition ${
+      className={`group relative flex flex-col gap-2 rounded-2xl bg-white p-2 text-left ring-1 transition duration-200 ${
         selected
-          ? 'ring-2 ring-brand-500'
-          : 'ring-slate-100 hover:ring-slate-200'
+          ? 'shadow-card ring-2 ring-brand-500'
+          : 'shadow-soft ring-slate-100 hover:-translate-y-0.5 hover:shadow-card hover:ring-slate-200'
       }`}
     >
-      <ProblemImage src={src} alt={`${id} 문제 이미지`} ratio={ratio} />
-      <div className="flex items-center justify-between px-1 pb-0.5">
-        <span className="text-sm font-semibold text-slate-900">{id}</span>
+      <div className="relative">
+        <ProblemImage src={src} alt={`${id} 문제 이미지`} ratio={ratio} />
         <span
-          className={`flex h-6 w-6 items-center justify-center rounded-full transition ${
+          className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full transition ${
             selected
-              ? 'bg-brand-500 text-white'
-              : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
+              ? 'bg-brand-500 text-white shadow-soft'
+              : 'bg-white/90 text-slate-300 ring-1 ring-slate-200 backdrop-blur group-hover:text-slate-400'
           }`}
           aria-hidden
         >
           {selected ? <IconCheck className="h-3.5 w-3.5" /> : <IconPlus className="h-3.5 w-3.5" />}
         </span>
       </div>
+      <span className="px-1 pb-0.5 text-sm font-bold tracking-tight text-slate-900">{id}</span>
     </button>
   );
 }
