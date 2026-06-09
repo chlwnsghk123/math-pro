@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { IconClose, IconPrint } from './Icons.jsx';
 import { useCartStore } from '../store/cartStore.js';
 import { useNotebookStore } from '../store/notebookStore.js';
+import { usePrefsStore } from '../store/prefsStore.js';
 import { useToastStore } from '../store/toastStore.js';
 
 function todayIso() {
@@ -15,18 +16,23 @@ export default function CreateNotebookModal({ open, onClose, onCreated }) {
   const clearCart = useCartStore((s) => s.clear);
   const create = useNotebookStore((s) => s.create);
   const toast = useToastStore((s) => s.show);
+  // New notebooks inherit the last-used answer-sheet settings (persisted).
+  const solutionMode = usePrefsStore((s) => s.solutionMode);
+  const handwriting = usePrefsStore((s) => s.handwriting);
 
-  const [title, setTitle] = useState(
-    () => localStorage.getItem('math-pro:last-title') || '오답 노트',
-  );
-  const [studentName, setStudentName] = useState(
-    () => localStorage.getItem('math-pro:last-name') || '',
-  );
+  // Title / name are intentionally NOT remembered — both reset to blank every
+  // time the modal opens.
+  const [title, setTitle] = useState('');
+  const [studentName, setStudentName] = useState('');
   const [studentDate, setStudentDate] = useState(() => todayIso());
 
-  // Reset date to today every time the modal opens.
+  // Reset the fields every time the modal opens.
   useEffect(() => {
-    if (open) setStudentDate(todayIso());
+    if (open) {
+      setTitle('');
+      setStudentName('');
+      setStudentDate(todayIso());
+    }
   }, [open]);
 
   useEffect(() => {
@@ -51,9 +57,9 @@ export default function CreateNotebookModal({ open, onClose, onCreated }) {
       studentName,
       studentDate,
       problemIds: items,
+      solutionMode,
+      handwriting,
     });
-    localStorage.setItem('math-pro:last-title', title);
-    localStorage.setItem('math-pro:last-name', studentName);
     toast(`오답노트가 생성되었습니다 (${items.length}문항)`, { tone: 'success' });
     clearCart();
     onClose();
@@ -90,13 +96,12 @@ export default function CreateNotebookModal({ open, onClose, onCreated }) {
         </header>
 
         <div className="flex flex-col gap-3">
-          <Field label="제목" required>
+          <Field label="제목" hint="비워두면 제목 없이 인쇄됩니다">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="예: 6월 모의고사 오답노트"
-              required
               className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none"
             />
           </Field>

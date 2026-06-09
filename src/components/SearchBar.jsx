@@ -44,7 +44,6 @@ export default function SearchBar({ onJump }) {
       toast('이미 담긴 문제입니다', { tone: 'warn' });
     } else {
       add(id);
-      toast(`${id} 담음`, { tone: 'success' });
     }
     setValue('');
     setOpen(false);

@@ -51,17 +51,15 @@ export default function MobileCartBar({ onCreate }) {
               className="mx-auto mt-2 mb-1 h-1.5 w-12 rounded-full bg-slate-200"
               aria-label="바텀시트 닫기"
             />
-            <div className="flex-1 overflow-hidden p-2">
-              <Cart
-                variant="sheet"
-                className="!shadow-none !ring-0"
-                onCreate={() => {
-                  setOpen(false);
-                  onCreate?.();
-                }}
-                onClose={() => setOpen(false)}
-              />
-            </div>
+            <Cart
+              variant="sheet"
+              className="min-h-0 flex-1 !rounded-none !shadow-none !ring-0"
+              onCreate={() => {
+                setOpen(false);
+                onCreate?.();
+              }}
+              onClose={() => setOpen(false)}
+            />
           </div>
         </div>
       )}
