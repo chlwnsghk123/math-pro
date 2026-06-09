@@ -1,6 +1,6 @@
 import { useCartStore } from '../store/cartStore.js';
 import { IconCart, IconClose, IconEmptyBox, IconPrint, IconTrash } from './Icons.jsx';
-import { parseProblemId } from '../config.js';
+import { parseProblemId } from '../data/catalog.js';
 import AnswerText, { answerOf } from './AnswerText.jsx';
 import ANSWERS from '../data/answers.js';
 

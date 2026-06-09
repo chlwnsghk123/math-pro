@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { buildImageUrl, getCategory, parseProblemId } from '../config.js';
+import { buildImageUrl, getCategory, parseProblemId } from '../data/catalog.js';
 import ANSWERS from '../data/answers.js';
 import AnswerText, { answerOf, solutionOf } from './AnswerText.jsx';
 import { IconBack, IconPrint } from './Icons.jsx';
@@ -826,11 +826,13 @@ function groupAnswerEntriesByChapter(items) {
  * clip a solution.
  * ───────────────────────────────────────────────────────────────────── */
 
-// Usable content height (mm) of one answer sheet, below the page header
-// and above the footer. Budget applies a safety factor on top.
-const ANSWER_CONTENT_MM = 158;
-const ANSWER_BUDGET_MM = ANSWER_CONTENT_MM * 0.84;
-const ANSWER_HEADER_MM = 13;
+// Usable height (mm) of ONE column on an answer sheet; two columns per page.
+// The page budget is "both columns" minus a margin for the worst case where a
+// tall item is pushed to the second column (column-major fill +
+// break-inside: avoid). `used` below is the total mm stacked across columns.
+const ANSWER_COLUMN_MM = 156;
+const ANSWER_BUDGET_MM = ANSWER_COLUMN_MM * 2 - 54; // ≈ 258
+const ANSWER_HEADER_MM = 12;
 
 function paginateAnswerGroups(groups, mode, valueFor) {
   const pages = [];
@@ -867,24 +869,24 @@ function paginateAnswerGroups(groups, mode, valueFor) {
 }
 
 /**
- * Estimated vertical footprint (mm) an answer item contributes to a page.
- * BOTH modes are 2-up now, so each item shares a row with a neighbour and
- * counts ~half. Solution mode uses a smaller font, so its per-line cost is
- * lower. Fractions, roots and matrices add height on top of the base.
+ * Estimated FULL vertical height (mm) of one answer item. Pagination sums
+ * these across all items + headers and compares to the two-column budget;
+ * the column flow then fills column-major. Solution mode is 9 pt (smaller
+ * per-line); fractions, roots and matrices add height.
  */
 function estimateItemMm(value, mode) {
   const solution = mode === 'solution';
   const lines = estimateLines(value);
-  const perLine = solution ? 4.8 : 6.5;
-  let h = solution ? 6 : 8; // number cell + item padding/border
+  const perLine = solution ? 4 : 6.5;
+  let h = 3; // number row baseline
   for (const ln of lines) {
     let lh = perLine;
-    if (/\\[dt]?frac|\\sqrt|\\[dt]?binom/.test(ln)) lh += solution ? 2 : 3;
+    if (/\\[dt]?frac|\\sqrt|\\[dt]?binom/.test(ln)) lh += solution ? 1.5 : 3;
     const rows = matrixRows(ln);
-    if (rows) lh += rows * (solution ? 4 : 5) + 2;
+    if (rows) lh += rows * (solution ? 3.5 : 5);
     h += lh;
   }
-  return (h + 3) * 0.55; // 2-column → each item ~half a column
+  return h + 5; // bottom margin + padding + border
 }
 
 function estimateLines(value) {

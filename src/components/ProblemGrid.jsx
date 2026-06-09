@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { buildImageUrl, getCategory, parseProblemId } from '../config.js';
+import { buildImageUrl, getCategory, parseProblemId } from '../data/catalog.js';
 import ProblemImage from './ProblemImage.jsx';
 import { IconCheck, IconPlus } from './Icons.jsx';
 import { useCartStore } from '../store/cartStore.js';

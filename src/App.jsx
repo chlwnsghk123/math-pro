@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import Tabs from './components/Tabs.jsx';
+import Navigator from './components/Navigator.jsx';
 import ProblemGrid from './components/ProblemGrid.jsx';
 import Cart from './components/Cart.jsx';
 import MobileCartBar from './components/MobileCartBar.jsx';
@@ -9,7 +9,15 @@ import PrintPreview from './components/PrintPreview.jsx';
 import NotebookList from './components/NotebookList.jsx';
 import CreateNotebookModal from './components/CreateNotebookModal.jsx';
 import { IconPrint } from './components/Icons.jsx';
-import { CATEGORIES, parseProblemId } from './config.js';
+import {
+  BOOKS,
+  CATEGORIES,
+  bookIdOf,
+  categoriesForBook,
+  getBook,
+  getCategory,
+  parseProblemId,
+} from './data/catalog.js';
 import ANSWERS from './data/answers.js';
 import { useCartStore } from './store/cartStore.js';
 import { useNotebookStore } from './store/notebookStore.js';
@@ -33,9 +41,29 @@ export default function App() {
     return map;
   }, []);
 
-  const [tab, setTab] = useState(
-    () => CATEGORIES.find((c) => (counts[c] ?? 0) > 0) || CATEGORIES[0],
-  );
+  // First category of a book, preferring one that actually has problems.
+  const firstCategoryOf = (bookId) => {
+    const cats = categoriesForBook(bookId);
+    return (cats.find((c) => (counts[c.code] ?? 0) > 0) || cats[0])?.code;
+  };
+  const defaultBook =
+    BOOKS.find((b) => categoriesForBook(b.id).some((c) => (counts[c.code] ?? 0) > 0))?.id ||
+    BOOKS[0].id;
+
+  const [book, setBook] = useState(defaultBook);
+  const [tab, setTab] = useState(() => firstCategoryOf(defaultBook));
+
+  function handleBook(id) {
+    setBook(id);
+    setTab(firstCategoryOf(id));
+  }
+
+  // Jump from search: switch to the problem's book + unit, then it can be added.
+  function handleJump(p) {
+    const b = bookIdOf(p.category);
+    if (b) setBook(b);
+    setTab(p.category);
+  }
 
   const openNotebook = openNotebookId
     ? notebooks.find((nb) => nb.id === openNotebookId)
@@ -57,7 +85,7 @@ export default function App() {
             </div>
           </div>
           <div className="hidden flex-1 max-w-md sm:block">
-            <SearchBar onJump={(p) => setTab(p.category)} />
+            <SearchBar onJump={handleJump} />
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -85,7 +113,18 @@ export default function App() {
         <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
           {/* Problem section */}
           <section className="flex flex-col gap-4">
-            <Tabs active={tab} onChange={setTab} counts={counts} />
+            <Navigator
+              book={book}
+              category={tab}
+              counts={counts}
+              onBook={handleBook}
+              onCategory={setTab}
+            />
+            <div className="flex items-baseline gap-2 px-1">
+              <span className="text-xs font-semibold text-slate-400">{getBook(book)?.name}</span>
+              <span className="text-slate-300">·</span>
+              <h2 className="text-sm font-bold text-slate-800">{getCategory(tab)?.unitName}</h2>
+            </div>
             <ProblemGrid category={tab} />
           </section>
 

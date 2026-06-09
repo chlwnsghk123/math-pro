@@ -1,7 +1,7 @@
 /**
  * Answer data.
  *
- * Keys use "{category}-{number}" (e.g. "9-1", "12-30") — see src/config.js.
+ * Keys use "{category}-{number}" (e.g. "9-1", "20-5") — see src/data/catalog.js.
  * Values may contain LaTeX wrapped in $...$ for inline math; plain text and
  * Unicode (e.g. ①②③④⑤, "해는 없다.") render as-is.
  *
