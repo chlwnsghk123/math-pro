@@ -172,15 +172,17 @@ and `4G`/`5G` for the two 실전감각 UP (기출) sets. `parseProblemId` splits
 
 ### Print pipeline (the critical part)
 
-There is **no canvas capture** anymore. The "PDF 저장" button calls
-`window.print()` after setting `document.title` to the desired filename and
-toggling `body.is-printing`. The scoped `@media print` block in
-`src/styles/index.css` hides UI chrome and lays each `[data-pdf-page]`
-article onto one A4-landscape sheet. The "정답 및 풀이" section is **paginated**
-in JS (`paginateAnswerGroups` in `PrintPreview.jsx`) by an estimated height so
-multi-line worked solutions never clip — `compact` (2-up final answers) vs
-`solution` (1-up, full-width) mode is auto-picked per notebook. See
-**docs/PRINT_FLOW.md** for the full story (page geometry, pagination, etc.).
+There is **no canvas capture** anymore. While `PrintPreview` is open it keeps
+`body.is-printing` on (a mount `useEffect`), so **every** print path — the
+"인쇄 / PDF" button, `Cmd/Ctrl+P`, and the mobile browser's own print/share
+menu — renders the clean sheet (the old toggle-at-click leaked the app chrome
+on mobile). The scoped `@media print` block in `src/styles/index.css` hides UI
+chrome and lays each `[data-pdf-page]` onto one A4-landscape sheet
+(`@page { size: A4 landscape }`; iOS can't be forced, so a mobile hint asks the
+user to pick 가로). The "정답 및 풀이" section is **paginated** in JS
+(`paginateAnswerGroups`) by estimated height vs a two-column budget so it never
+clips — 답만 (final answers) vs 풀이 (worked solutions) per the notebook's
+`solutionMode`. See **docs/PRINT_FLOW.md** for the full story.
 
 ### State boundaries
 

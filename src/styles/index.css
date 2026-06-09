@@ -47,11 +47,12 @@
 }
 
 /* ============================================================
- * PRINT FALLBACK
- * PDF generation is handled by html2canvas + jsPDF (see PrintPreview).
- * These rules only fire if the user opens the browser print dialog
- * directly (e.g. Cmd/Ctrl+P), so they hide the UI chrome and let
- * the captured preview pages flow onto paper.
+ * PRINT
+ * The app prints straight from the DOM via window.print() — no canvas.
+ * While PrintPreview is open it keeps `body.is-printing` on the <body>,
+ * so these rules fire for ANY print path (our button, Cmd/Ctrl+P, or the
+ * mobile browser's own print/share menu): hide the app chrome and lay each
+ * [data-pdf-page] onto one A4-landscape sheet. See docs/PRINT_FLOW.md.
  * ============================================================ */
 @media print {
   @page {
