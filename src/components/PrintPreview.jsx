@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { buildImageUrl, CHAPTERS, parseProblemId } from '../config.js';
+import { buildImageUrl, getCategory, parseProblemId } from '../config.js';
 import ANSWERS from '../data/answers.js';
 import AnswerText from './AnswerText.jsx';
 import { IconBack, IconPrint } from './Icons.jsx';
@@ -50,8 +50,28 @@ export default function PrintPreview({ notebook, onClose }) {
   /** Answer key: one group per chapter, in cart order. */
   const answerGroups = useMemo(() => groupAnswerEntriesByChapter(items), [items]);
 
-  // Page numbering: every problem page + 1 answer page (if any)
-  const totalPages = pages.length + (answerGroups.length > 0 ? 1 : 0);
+  // `solution` mode when any selected answer is a multi-line worked
+  // solution (식 중심 풀이); otherwise the compact 2-up final-answer grid.
+  const answerMode = useMemo(
+    () => (items.some((id) => String(ANSWERS[id] ?? '').includes('\n')) ? 'solution' : 'compact'),
+    [items],
+  );
+
+  /** Answer / solution pages, paginated so nothing clips off a sheet. */
+  const answerPages = useMemo(
+    () => paginateAnswerGroups(answerGroups, answerMode),
+    [answerGroups, answerMode],
+  );
+
+  // The answer section must begin on an ODD page so that, when printed
+  // double-sided, it lands on the front face of a fresh sheet. If the
+  // problem pages end on an odd page (so the answer would start on an even
+  // page), slip one intentionally-blank page in between.
+  const needBlank = answerPages.length > 0 && pages.length % 2 === 1;
+  const answerStart = pages.length + (needBlank ? 1 : 0);
+
+  // Page numbering: problem pages + (optional blank) + answer/solution pages.
+  const totalPages = answerStart + answerPages.length;
 
   function handleDownload() {
     handleBrowserPrint({ title, studentName, studentDate });
@@ -143,13 +163,17 @@ export default function PrintPreview({ notebook, onClose }) {
                   totalPages={totalPages}
                 />
               ))}
-              {answerGroups.length > 0 && (
+              {needBlank && <BlankPage />}
+              {answerPages.map((blocks, idx) => (
                 <AnswerKeyPage
-                  groups={answerGroups}
-                  pageNumber={totalPages}
+                  key={`ans-${idx}`}
+                  blocks={blocks}
+                  mode={answerMode}
+                  isFirst={idx === 0}
+                  pageNumber={answerStart + idx + 1}
                   totalPages={totalPages}
                 />
-              )}
+              ))}
             </>
           )}
         </div>
@@ -179,6 +203,37 @@ const pageStyle = {
   boxShadow:
     '0 1px 0 rgba(0,0,0,.04), 0 12px 32px -12px rgba(0,0,0,.18), 0 2px 6px -2px rgba(0,0,0,.06)',
 };
+
+/**
+ * Intentionally-blank filler sheet so the answer section starts on an odd
+ * page (front face) when printed double-sided. Carries the same
+ * `[data-pdf-page]` tag so it occupies exactly one A4 sheet, and a faint
+ * centred note that only reads as a watermark on screen / paper.
+ */
+function BlankPage() {
+  return (
+    <article
+      data-pdf-page
+      style={{
+        ...pageStyle,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <span
+        style={{
+          fontFamily: FONT_MONO,
+          fontSize: '8pt',
+          letterSpacing: '0.28em',
+          textTransform: 'uppercase',
+          color: C.ink4,
+        }}
+      >
+        이 페이지는 비워 둠
+      </span>
+    </article>
+  );
+}
 
 function ProblemPage({
   title,
@@ -457,12 +512,9 @@ function ProblemImage({ id }) {
   );
 }
 
-function PageFooter({ unitCode, unitName, pageNumber, totalPages }) {
-  const left = unitCode
-    ? `오답 노트 · Unit ${unitCode}`
-    : unitName
-      ? `오답 노트 · ${unitName}`
-      : '오답 노트';
+function PageFooter({ unitName, pageNumber, totalPages }) {
+  // Bottom-left shows the unit name only (no "오답 노트" prefix).
+  const left = unitName || '';
   return (
     <div
       style={{
@@ -497,16 +549,32 @@ function pad2(n) {
  * Answer key (last page) — column-count: 2, one section per chapter
  * ───────────────────────────────────────────────────────────────────── */
 
-function AnswerKeyPage({ groups, pageNumber, totalPages }) {
+/**
+ * One answer/solution sheet. `blocks` is the pre-paginated list of header
+ * / item blocks for this page (see paginateAnswerGroups). Consecutive
+ * items under the same header are regrouped into a chunk so a chapter that
+ * spills onto the next page just re-emits its header.
+ */
+function AnswerKeyPage({ blocks, mode, isFirst, pageNumber, totalPages }) {
+  const chunks = [];
+  let cur = null;
+  for (const b of blocks) {
+    if (b.type === 'header') {
+      cur = { header: b, items: [] };
+      chunks.push(cur);
+    } else {
+      if (!cur) {
+        cur = { header: null, items: [] };
+        chunks.push(cur);
+      }
+      cur.items.push(b);
+    }
+  }
+
   return (
     <article data-pdf-page style={pageStyle}>
       <header style={{ marginBottom: '4mm', flexShrink: 0 }}>
-        <div
-          style={{
-            paddingBottom: '6mm',
-            borderBottom: `1px solid ${C.ink}`,
-          }}
-        >
+        <div style={{ paddingBottom: '5mm', borderBottom: `1px solid ${C.ink}` }}>
           <h1
             style={{
               margin: 0,
@@ -517,34 +585,26 @@ function AnswerKeyPage({ groups, pageNumber, totalPages }) {
               color: C.ink,
             }}
           >
-            정답
+            정답 및 풀이{isFirst ? '' : ' (계속)'}
           </h1>
         </div>
       </header>
 
-      <div
-        style={{
-          flex: 1,
-          columnCount: 2,
-          columnGap: '14mm',
-          padding: '4mm 0',
-          minHeight: 0,
-        }}
-      >
-        {groups.map((group, idx) => (
-          <AnswerGroup
-            key={group.category}
-            unitCode={group.unitCode}
-            unitName={group.unitName}
-            entries={group.items}
-            isLast={idx === groups.length - 1}
+      <div style={{ flex: 1, padding: '3mm 0', minHeight: 0 }}>
+        {chunks.map((c, idx) => (
+          <AnswerChunk
+            key={idx}
+            header={c.header}
+            items={c.items}
+            mode={mode}
+            isLast={idx === chunks.length - 1}
           />
         ))}
       </div>
 
       <PageFooter
         unitCode={null}
-        unitName="정답지"
+        unitName="정답 및 풀이"
         pageNumber={pageNumber}
         totalPages={totalPages}
       />
@@ -552,65 +612,61 @@ function AnswerKeyPage({ groups, pageNumber, totalPages }) {
   );
 }
 
-function AnswerGroup({ unitCode, unitName, entries, isLast }) {
+function AnswerChunk({ header, items, mode, isLast }) {
   return (
-    <section
-      style={{
-        breakInside: 'avoid',
-        pageBreakInside: 'avoid',
-        marginBottom: isLast ? 0 : '10pt',
-      }}
-    >
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: '4mm',
-          borderBottom: `1.5px solid ${C.ink}`,
-          paddingBottom: '2mm',
-          marginBottom: '4mm',
-          breakAfter: 'avoid-column',
-          pageBreakAfter: 'avoid',
-          wordBreak: 'keep-all',
-        }}
-      >
-        <span
+    <section style={{ marginBottom: isLast ? 0 : '7mm' }}>
+      {header && (
+        <div
           style={{
-            fontFamily: FONT_MONO,
-            fontSize: '11pt',
-            fontWeight: 600,
-            color: C.ink,
-            letterSpacing: '-0.01em',
-            flexShrink: 0,
-          }}
-        >
-          {unitCode}
-        </span>
-        <span
-          style={{
-            fontSize: '11.5pt',
-            fontWeight: 700,
-            color: C.ink,
-            letterSpacing: '-0.015em',
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: '4mm',
+            borderBottom: `1.5px solid ${C.ink}`,
+            paddingBottom: '2mm',
+            marginBottom: '4mm',
             wordBreak: 'keep-all',
-            flex: 1,
           }}
         >
-          {unitName}
-        </span>
-      </header>
+          <span
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: '11pt',
+              fontWeight: 600,
+              color: C.ink,
+              letterSpacing: '-0.01em',
+              flexShrink: 0,
+            }}
+          >
+            {header.unitCode}
+          </span>
+          <span
+            style={{
+              fontSize: '11.5pt',
+              fontWeight: 700,
+              color: C.ink,
+              letterSpacing: '-0.015em',
+              wordBreak: 'keep-all',
+              flex: 1,
+            }}
+          >
+            {header.unitName}
+          </span>
+        </div>
+      )}
       <ol
         style={{
           listStyle: 'none',
           margin: 0,
           padding: 0,
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          // Compact final answers pack two-up; worked solutions get the
+          // full sheet width so multi-line steps and matrices never crowd.
+          gridTemplateColumns: mode === 'solution' ? '1fr' : '1fr 1fr',
           columnGap: '10mm',
-          rowGap: '5mm',
+          rowGap: mode === 'solution' ? '5mm' : '5mm',
         }}
       >
-        {entries.map(({ id, displayNumber }) => (
+        {items.map(({ id, displayNumber }) => (
           <li
             key={id}
             style={{
@@ -620,10 +676,10 @@ function AnswerGroup({ unitCode, unitName, entries, isLast }) {
               gap: '3mm',
               fontSize: '11pt',
               color: C.ink,
-              // Display-style fractions inline take ~2× normal line
-              // height, so set lineHeight high enough that adjacent
-              // inline math glyphs never crowd each other.
-              lineHeight: 2.1,
+              // Compact rows hold inline display-fractions, so they need a
+              // tall line-height; solution rows stack each step as its own
+              // block, so a normal line-height keeps them tight.
+              lineHeight: mode === 'solution' ? 1.55 : 2.1,
               minWidth: 0,
               paddingBottom: '4mm',
               borderBottom: `1px dashed ${C.hairSoft}`,
@@ -650,7 +706,7 @@ function AnswerGroup({ unitCode, unitName, entries, isLast }) {
                 overflowWrap: 'anywhere',
               }}
             >
-              <AnswerText value={ANSWERS[id]} multiline />
+              <AnswerText value={ANSWERS[id]} multiline lineGap={mode === 'solution' ? 1.6 : 3} />
             </span>
           </li>
         ))}
@@ -693,8 +749,9 @@ function annotatePages(pages) {
   return pages.map((items) => {
     const parsed = parseProblemId(items[0]);
     const cat = parsed?.category;
-    const unitName = CHAPTERS[cat] ? extractUnitName(CHAPTERS[cat]) : null;
-    const unitCode = CHAPTERS[cat] ? extractUnitCode(CHAPTERS[cat]) : null;
+    const entry = cat ? getCategory(cat) : null;
+    const unitName = entry ? entry.unitName : null;
+    const unitCode = entry ? entry.unitCode : null;
     const isFirstOfChapter = cat && !seen.has(cat);
     if (isFirstOfChapter) seen.add(cat);
     return {
@@ -719,11 +776,11 @@ function groupAnswerEntriesByChapter(items) {
     const parsed = parseProblemId(id);
     if (!parsed) continue;
     if (!current || current.category !== parsed.category) {
-      const chapter = CHAPTERS[parsed.category] || parsed.category;
+      const entry = getCategory(parsed.category);
       current = {
         category: parsed.category,
-        unitCode: extractUnitCode(chapter) || parsed.category,
-        unitName: extractUnitName(chapter) || '',
+        unitCode: entry ? entry.unitCode : parsed.category,
+        unitName: entry ? entry.unitName : '',
         items: [],
       };
       groups.push(current);
@@ -733,14 +790,97 @@ function groupAnswerEntriesByChapter(items) {
   return groups;
 }
 
-/** "09 이차부등식과 연립이차부등식" → "09" */
-function extractUnitCode(chapter) {
-  const m = chapter.match(/^(\d+)/);
-  return m ? m[1] : null;
+/* ─────────────────────────────────────────────────────────────────────
+ * Answer / solution pagination
+ *
+ * The answer sheet used to be a single fixed page, which clipped once the
+ * content (now multi-line 수능형 풀이) overran one sheet. We instead pack
+ * header/item blocks into pages by an estimated height so each [data-pdf-
+ * page] holds only what fits. Estimates are deliberately conservative —
+ * over-estimating just wastes a little paper, while under-estimating would
+ * clip a solution.
+ * ───────────────────────────────────────────────────────────────────── */
+
+// Usable content height (mm) of one answer sheet, below the page header
+// and above the footer. Budget applies a safety factor on top.
+const ANSWER_CONTENT_MM = 158;
+const ANSWER_BUDGET_MM = ANSWER_CONTENT_MM * 0.84;
+const ANSWER_HEADER_MM = 13;
+
+function paginateAnswerGroups(groups, mode) {
+  const pages = [];
+  let page = [];
+  let used = 0;
+  const flush = () => {
+    if (page.length) {
+      pages.push(page);
+      page = [];
+      used = 0;
+    }
+  };
+  for (const group of groups) {
+    let needHeader = true;
+    for (const it of group.items) {
+      const itemMm = estimateItemMm(ANSWERS[it.id], mode);
+      const inc = (needHeader ? ANSWER_HEADER_MM : 0) + itemMm;
+      if (used > 0 && used + inc > ANSWER_BUDGET_MM) {
+        flush();
+        needHeader = true;
+      }
+      if (needHeader) {
+        page.push({ type: 'header', unitCode: group.unitCode, unitName: group.unitName });
+        used += ANSWER_HEADER_MM;
+        needHeader = false;
+      }
+      page.push({ type: 'item', id: it.id, displayNumber: it.displayNumber });
+      used += itemMm;
+    }
+  }
+  flush();
+  return pages;
 }
-/** "09 이차부등식과 연립이차부등식" → "이차부등식과 연립이차부등식" */
-function extractUnitName(chapter) {
-  return chapter.replace(/^\d+\s+/, '');
+
+/**
+ * Estimated vertical footprint (mm) an answer item contributes to a page.
+ * In compact (2-up) mode each item shares a row with a neighbour, so it
+ * counts ~half; in solution (1-up) mode it counts full. Fractions, roots
+ * and matrices add height on top of the base per-line cost.
+ */
+function estimateItemMm(value, mode) {
+  const lines = estimateLines(value);
+  let h = 8; // number cell + item padding/border
+  for (const ln of lines) {
+    let lh = 6.5;
+    if (/\\[dt]?frac|\\sqrt|\\[dt]?binom/.test(ln)) lh += 3;
+    const rows = matrixRows(ln);
+    if (rows) lh += rows * 5 + 3;
+    h += lh;
+  }
+  h += 3;
+  return mode === 'solution' ? h : h * 0.55;
+}
+
+function estimateLines(value) {
+  const str = String(value ?? '');
+  if (!str) return ['—'];
+  const out = [];
+  for (const raw of str.split('\n')) {
+    for (const part of raw.split(/\s{2,}(?=\(\d+\))/g)) {
+      if (part.trim().length > 0) out.push(part);
+    }
+  }
+  return out.length ? out : ['—'];
+}
+
+/** Total matrix rows referenced in a line (pmatrix/bmatrix), for height. */
+function matrixRows(line) {
+  let rows = 0;
+  const re = /\\begin\{[bp]matrix\}([\s\S]*?)\\end\{[bp]matrix\}/g;
+  let m;
+  while ((m = re.exec(line))) {
+    rows += (m[1].match(/\\\\/g) || []).length + 1;
+  }
+  return rows;
 }
 
 /* ─────────────────────────────────────────────────────────────────────

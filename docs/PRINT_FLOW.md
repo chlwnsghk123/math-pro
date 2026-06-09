@@ -37,9 +37,12 @@ src/components/PrintPreview.jsx
     │     ├── QuadrantGrid        ← 2×2 cell grid
     │     └── PageFooter          ← "오답 노트 · Unit XX" + "01 / 04"
     │
-    └── AnswerKeyPage             ← last A4 sheet, 2-column grouped list
-          └── AnswerGroup         ← one section per chapter
-                └── AnswerText (multiline)   ← (1)(2)(3) sub-parts as blocks
+    ├── paginateAnswerGroups()    ← packs header/item blocks into A4 sheets by
+    │                                estimated height (no clipping); picks
+    │                                `compact` (2-up) vs `solution` (1-up) mode
+    └── AnswerKeyPage (×N)        ← "정답 및 풀이" sheets
+          └── AnswerChunk         ← one header + its items (chapter may span
+                └── AnswerText (multiline)   ← `\n` steps / (1)(2)(3) sub-parts
 
 src/styles/index.css
     └── @media print { … }        ← scoped to body.is-printing
@@ -206,12 +209,26 @@ groupAnswerEntriesByChapter(items)
       numbering instead of being re-indexed 1..N per chapter.
 ```
 
+## 6b. Answer / solution pagination
+
+The answer sheet used to be a single fixed page (it clipped once worked
+solutions arrived). Now `paginateAnswerGroups(groups, mode)` packs
+header/item blocks into pages by an **estimated height** (`estimateItemMm`
+accounts for fractions, roots and matrices). Estimates are deliberately
+conservative — over-estimating wastes a little paper, under-estimating would
+clip. A chapter that overflows simply re-emits its header on the next page.
+
+`mode` is auto-picked per notebook: **`solution`** (1-up, full-width — for
+multi-line `\n` solutions, so wide matrices/steps never crowd) if any selected
+answer contains a `\n`, else **`compact`** (the classic 2-up final-answer grid).
+
 ## 7. Answer rendering quirks
 
-- `AnswerText` with `multiline` puts each `(1) … (2) …` sub-part in a
-  `display: block` span. Each block grows to fit its inline content,
-  including display-style fractions. The 3 mm `marginTop` between
-  blocks keeps tall fractions from crowding the next sub-part.
+- `AnswerText` with `multiline` puts each `\n` step / `(1) … (2) …` sub-part in
+  a `display: block` span. Each block grows to fit its inline content,
+  including display-style fractions/matrices. `lineGap` mm `marginTop` between
+  blocks keeps tall content from crowding the next line (3 mm compact, ~1.6 mm
+  solution).
 - `normalizeForDisplay` rewrites every `\frac` to `\dfrac` (and the
   matching `\binom → \dbinom`) so the answer key has uniform display-
   style fractions regardless of how the source string spelled the

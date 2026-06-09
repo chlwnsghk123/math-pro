@@ -74,7 +74,7 @@ export default function SearchBar({ onJump }) {
             setValue(e.target.value);
             setOpen(true);
           }}
-          placeholder="문제 번호 검색 · 예: 7-30"
+          placeholder="문제 번호 검색 · 예: 7-30, 20-5"
           className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
         />
         {value && (

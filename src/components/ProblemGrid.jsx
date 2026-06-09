@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { buildImageUrl, parseProblemId } from '../config.js';
+import { buildImageUrl, getCategory, parseProblemId } from '../config.js';
 import ProblemImage from './ProblemImage.jsx';
 import { IconCheck, IconPlus } from './Icons.jsx';
 import { useCartStore } from '../store/cartStore.js';
@@ -21,9 +21,9 @@ export default function ProblemGrid({ category }) {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-2 rounded-2xl bg-white text-center text-sm text-slate-500 shadow-soft ring-1 ring-slate-100">
         <span className="text-base font-semibold text-slate-700">
-          {category} 카테고리 문제 없음
+          {getCategory(category)?.tab || category} · 문제 없음
         </span>
-        <span>JSON 데이터에 문제가 추가되면 표시됩니다.</span>
+        <span>문제가 추가되면 표시됩니다.</span>
       </div>
     );
   }
@@ -42,6 +42,9 @@ function ProblemCard({ id, category, number }) {
   const toggle = useCartStore((s) => s.toggle);
   const toast = useToastStore((s) => s.show);
   const src = buildImageUrl(category, number);
+  // Legacy problems are tall/narrow; lecture problems (단원→강) are wide
+  // statement blocks, so give those cards a landscape frame.
+  const ratio = getCategory(category)?.kind === 'lecture' ? '4 / 3' : '3 / 4';
 
   function onClick() {
     const result = toggle(id);
@@ -60,7 +63,7 @@ function ProblemCard({ id, category, number }) {
           : 'ring-slate-100 hover:ring-slate-200'
       }`}
     >
-      <ProblemImage src={src} alt={`${id} 문제 이미지`} ratio="3 / 4" />
+      <ProblemImage src={src} alt={`${id} 문제 이미지`} ratio={ratio} />
       <div className="flex items-center justify-between px-1 pb-0.5">
         <span className="text-sm font-semibold text-slate-900">{id}</span>
         <span
