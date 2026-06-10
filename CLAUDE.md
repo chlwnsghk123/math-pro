@@ -1,5 +1,14 @@
 # CLAUDE.md — Agent Onboarding Guide
 
+> ## ⚠️ DEPRECATED — 이 저장소는 폐기 예정입니다 (2026-06)
+>
+> 모든 콘텐츠(카탈로그·답안 285건·이미지 전량)와 손글씨 기능은
+> **[`chlwnsghk123/note-pro`](https://github.com/chlwnsghk123/note-pro)** 로
+> 이관 완료되었습니다 — note-pro의 시드(`scripts/seed/`)가 이 저장소의
+> `src/data/*`와 동일하며, 전용 테넌트 `/nvy/math-pro` 로 서빙됩니다
+> (note-pro `docs/MIGRATION_MATH_PRO.md` 참고). **여기에 새 작업을 하지 말고
+> note-pro에서 작업하세요.**
+
 > **Audience:** Claude Code and other AI agents picking up work on this repo.
 > Read this first, then dive into `docs/` for specifics.
 
